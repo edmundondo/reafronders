@@ -4,6 +4,6 @@
 // Row Level Security in the reafrondersbe migrations decides who can write.
 // Leave blank to run fully offline from data/seed.json + your browser storage.
 export const CONFIG = {
-  SUPABASE_URL: '',
-  SUPABASE_ANON_KEY: '',
+  SUPABASE_URL: 'https://etdxreehedewcctkdvuo.supabase.co',
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV0ZHhyZWVoZWRld2NjdGtkdnVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzOTkwMDQsImV4cCI6MjEwMTk3NTAwNH0.8ohFQBJzglP2cjsdQW-xQ-g2DPNG0iZiNzRTLQDsVMY',
 };
