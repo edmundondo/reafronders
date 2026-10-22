@@ -35,7 +35,7 @@ export const PALETTES = {
   country:  { label: "Country's own palette", bg: [4, 6, 10], ambient: null },
 };
 export const MODES = { flow: 'Flow — curl-noise rivers', pulse: 'Pulse — locks to BPM', constellation: 'Constellation — wonders connected' };
-export const MOTIONS = ['cascade', 'orbit', 'ripple', 'sink', 'zigzag', 'herd', 'mist'];
+export const MOTIONS = ['cascade', 'orbit', 'ripple', 'sink', 'zigzag', 'herd', 'mist', 'bloom'];
 
 export class Art {
   constructor(canvas, bloom) {
@@ -208,6 +208,7 @@ export class Art {
             case 'zigzag':  ax += (Math.sin(this.age[i] * 0.18) > 0 ? 0.9 : -0.9); ay += 0.55; break;
             case 'herd':    ax = fx * 0.8 - nx * 0.12 * (d > R * 1.4); ay = fy * 0.8 - ny * 0.12 * (d > R * 1.4); damp = 0.93; break;
             case 'mist':    ax += fx * 0.6; ay += -0.35; damp = 0.92; break;
+            case 'bloom': { const p = Math.sin(this.age[i] * 0.09 + k); ax += nx * p * 0.8 - ny * 0.3 * vort; ay += ny * p * 0.8 + nx * 0.3 * vort; if (d > R * 2.4) this.age[i] = 1e9; break; }
           }
           if (kick) { ax += nx * 4; ay += ny * 4; }
           this.vx[i] = this.vx[i] * damp + ax * speed * 0.6; this.vy[i] = this.vy[i] * damp + ay * speed * 0.6;

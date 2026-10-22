@@ -17,6 +17,7 @@ export class Tour {
     this.el = document.getElementById('tour');
     this.stage = this.el.querySelector('.t-stage');
     this.video = document.getElementById('tour-video');
+    this.photos = this.el.querySelector('.t-photos'); this.ph = [...this.photos.querySelectorAll('img')]; this.front = 0;
     this.c = document.getElementById('tour-canvas'); this.ctx = this.c.getContext('2d');
     this.leader = document.getElementById('tour-leader');
     this.sc = document.createElement('canvas'); this.sctx = this.sc.getContext('2d', { willReadFrequently: true });
@@ -46,7 +47,13 @@ export class Tour {
     this.ui.morph.oninput = () => { this.opts.morph = +this.ui.morph.value; this.saveOpts(); };
     this.ui.loop.onchange = () => { this.opts.loop = +this.ui.loop.value; this.saveOpts(); };
     this.ui.trans.oninput = () => { this.opts.trans = +this.ui.trans.value; this.saveOpts(); };
-    this.video.addEventListener('error', () => this.markNoVideo('Footage could not load — check the URL in Studio.'));
+    // a broken video falls back to the photo loop when there is one
+    this.video.addEventListener('error', (e) => {
+      const srcs = this.video.querySelectorAll('source');
+      if (e.target.tagName === 'SOURCE' && e.target !== srcs[srcs.length - 1]) return; // the browser will try the next source
+      if (!this.hasVideo) return;
+      if (this.images?.length) this.usePhotos(); else this.markNoVideo('Footage could not load — check the URL in Studio.');
+    }, true);
     addEventListener('keydown', (e) => {
       if (!this.open || this.journey || e.target.matches('input, textarea, select')) return;
       const k = e.key.toLowerCase();
@@ -160,7 +167,8 @@ export class Tour {
   }
 
   load(w) {
-    this.w0 = w; this.t = 0; this.pixels = null; this.sampleOK = false; this.hasVideo = false; this.doneSent = false;
+    this.w0 = w; this.t = 0; this.pixels = null; this.sampleOK = false; this.hasVideo = false; this.hasPhotos = false; this.doneSent = false;
+    this.images = (w.media?.images || []).filter(x => x && x.url); this.slot = -1;
     this.base = hexRGB(w.art?.color); this.motion = w.art?.motion || 'orbit';
     this.leader.style.setProperty('--c', w.art?.color || '#fff');
     // the swarm bursts from the pin: convert the pin to stage coordinates
@@ -176,7 +184,7 @@ export class Tour {
     this.ui.note.textContent = m.note || '';
     this.ui.credit.innerHTML = m.video ? `Footage: ${esc(m.credit || 'unknown')} · ${m.source ? `<a href="${esc(m.source)}" target="_blank" rel="noopener">${esc(m.license || 'source')}</a>` : esc(m.license || '')}` : '';
     this.video.pause(); this.video.removeAttribute('src'); this.video.innerHTML = '';
-    this.video.style.opacity = 0;
+    this.video.style.opacity = 0; this.photos.style.opacity = 0; this.ph.forEach(im => { im.style.opacity = 0; im.removeAttribute('src'); });
     if (m.video) {
       this.hasVideo = true; this.ui.empty.hidden = true;
       this.video.crossOrigin = 'anonymous'; this.video.loop = true; this.video.muted = this.opts.muted; this.video.playsInline = true;
@@ -185,16 +193,40 @@ export class Tour {
       for (const [src, type] of srcs) { const s = document.createElement('source'); s.src = src; s.type = type; this.video.appendChild(s); }
       this.video.load();
       this.video.addEventListener('loadeddata', () => { this.video.currentTime = +m.start || 0; if (this.playing) this.video.play().catch(() => { }); }, { once: true });
-    } else this.markNoVideo(this.journey ? 'Footage coming soon' : 'Footage coming soon — add a video URL in Studio → Edit → Virtual tour.');
+    } else if (this.images.length) this.usePhotos();
+    else this.markNoVideo(m.note || (this.journey ? 'Footage coming soon' : 'Footage coming soon — add a video or photos in Studio → Edit → Virtual tour.'));
     this.setMute(this.journey ? true : this.opts.muted, true); this.playing = true; this.syncPlay();
     if (!this.journey) this.onChange?.(w);
   }
 
-  markNoVideo(msg) { this.hasVideo = false; this.ui.empty.hidden = false; this.ui.empty.textContent = msg; this.video.style.opacity = 0; }
+  markNoVideo(msg) { this.hasVideo = false; this.hasPhotos = false; this.ui.empty.hidden = false; this.ui.empty.textContent = msg; this.video.style.opacity = 0; }
+  get hasMedia() { return this.hasVideo || this.hasPhotos; }
+
+  // ── photo "virtual camera": each image gets an equal share of the loop, a slow
+  // push-in with drift (Ken Burns), and a crossfade into the next ─────────────
+  usePhotos() {
+    this.hasVideo = false; this.hasPhotos = true; this.ui.empty.hidden = true; this.video.style.opacity = 0; this.slot = -1;
+    this.ph[0].src = this.images[0].url; if (this.images[1]) this.ph[1].src = this.images[1].url;
+  }
+  showPhoto(i) {
+    const img = this.images[i], back = this.ph[1 - this.front];
+    const swap = () => { back.style.opacity = 1; this.ph[this.front].style.opacity = 0; this.front = 1 - this.front; };
+    if (back.getAttribute('src') !== img.url) { back.onload = swap; back.src = img.url; } else if (back.complete) swap(); else back.onload = swap;
+    const n = this.images.length;
+    this.ui.credit.innerHTML = `Photo ${n > 1 ? `${i + 1}/${n}: ` : ''}${esc(img.credit || 'unknown')} · ${img.source ? `<a href="${esc(img.source)}" target="_blank" rel="noopener">${esc(img.license || 'source')}</a>` : esc(img.license || '')}`;
+  }
+  kenBurns(t, L) {
+    const n = this.images.length, slotLen = L / n, slot = Math.min(n - 1, Math.floor(t / slotLen));
+    if (slot !== this.slot) { this.slot = slot; this.showPhoto(slot); const nx = this.images[slot + 1]; if (nx) setTimeout(() => { const b = this.ph[1 - this.front]; if (b.getAttribute('src') !== nx.url) b.src = nx.url; }, 1400); }
+    const k = (t - slot * slotLen) / slotLen, dir = slot % 2 ? -1 : 1;
+    const img = this.ph[this.front];
+    img.style.transform = `scale(${(1.06 + 0.12 * k).toFixed(4)}) translate(${(dir * 2.5 * k).toFixed(3)}%, ${(((slot % 3) - 1) * 1.8 * k).toFixed(3)}%)`;
+  }
+  source() { return this.hasVideo ? this.video : this.ph[this.front]; }
 
   loopLen() {
     if (!this.journey) return this.opts.loop;
-    return this.hasVideo ? this.journey.dwell : Math.max(5, this.journey.dwell * 0.5);
+    return this.hasMedia ? this.journey.dwell : Math.max(5, this.journey.dwell * 0.5);
   }
   toggle() { this.playing = !this.playing; this.syncPlay(); }
   syncPlay() {
@@ -237,10 +269,12 @@ export class Tour {
 
   // sample the current video frame with the same "cover" crop the <video> uses
   sample() {
-    const v = this.video; if (!this.hasVideo || v.readyState < 2 || !v.videoWidth) return;
-    const s = Math.max(this.w / v.videoWidth, this.h / v.videoHeight), cw = this.w / s, ch = this.h / s;
+    if (!this.hasMedia) return;
+    const v = this.source(), vw = v.videoWidth || v.naturalWidth, vh = v.videoHeight || v.naturalHeight;
+    if (!vw || (this.hasVideo && v.readyState < 2) || (!this.hasVideo && !v.complete)) return;
+    const s = Math.max(this.w / vw, this.h / vh), cw = this.w / s, ch = this.h / s;
     try {
-      this.sctx.drawImage(v, (v.videoWidth - cw) / 2, (v.videoHeight - ch) / 2, cw, ch, 0, 0, this.sw, this.sh);
+      this.sctx.drawImage(v, (vw - cw) / 2, (vh - ch) / 2, cw, ch, 0, 0, this.sw, this.sh);
       this.pixels = this.sctx.getImageData(0, 0, this.sw, this.sh).data; this.sampleOK = true;
     } catch { this.sampleOK = false; this.pixels = null; } // tainted (no CORS) → plain crossfade
   }
@@ -264,13 +298,15 @@ export class Tour {
     }
     const t = this.t;
     // envelope: 0 = pure particles, 1 = pure footage
-    const env = this.hasVideo ? smooth(T * 0.35, T, t) * (1 - smooth(L - T, L - T * 0.25, t)) : 0;
+    if (this.hasPhotos) this.kenBurns(t, L);
+    const env = this.hasMedia ? smooth(T * 0.35, T, t) * (1 - smooth(L - T, L - T * 0.25, t)) : 0;
     // how strongly particles adopt footage colours/edges
-    const learn = this.hasVideo && this.sampleOK ? Math.max(smooth(0, T * 0.7, t) * (1 - smooth(L - T * 0.25, L, t)), 0) : 0;
+    const learn = this.hasMedia && this.sampleOK ? Math.max(smooth(0, T * 0.7, t) * (1 - smooth(L - T * 0.25, L, t)), 0) : 0;
 
     if (this.frame++ % 3 === 0) this.sample();
-    this.video.style.opacity = env.toFixed(3);
-    this.video.style.filter = `blur(${((1 - env) * 18).toFixed(1)}px) saturate(${(1 + (1 - env) * 0.6).toFixed(2)})`;
+    const layer = this.hasPhotos ? this.photos : this.video;
+    layer.style.opacity = env.toFixed(3);
+    layer.style.filter = `blur(${((1 - env) * 18).toFixed(1)}px) saturate(${(1 + (1 - env) * 0.6).toFixed(2)})`;
 
     const ctx = this.ctx, veil = env > 0.98 ? this.opts.morph : 1 - env * (1 - this.opts.morph);
     ctx.globalCompositeOperation = 'source-over';
@@ -300,6 +336,7 @@ export class Tour {
         case 'sink': ax += (-ny * 0.5 - nx * 0.2) * k; ay += (nx * 0.5 - ny * 0.2) * k; break;
         case 'ripple': ax += nx * 0.25 * k; ay += ny * 0.25 * k; break;
         case 'mist': ay -= 0.25 * k; break;
+        case 'bloom': { const p = Math.sin(this.age[i] * 0.08); ax += (nx * p * 0.5 - ny * 0.2) * k; ay += (ny * p * 0.5 + nx * 0.2) * k; break; }
         case 'zigzag': ax += (Math.sin(this.age[i] * 0.15) > 0 ? 0.45 : -0.45) * k; ay += 0.2 * k; break;
         default: ax -= nx * 0.07 * k * (d > R); ay -= ny * 0.07 * k * (d > R);
       }
@@ -328,7 +365,7 @@ export class Tour {
     ctx.globalAlpha = 1;
 
     this.ui.fill.style.width = `${(t / L) * 100}%`;
-    const phase = !this.hasVideo ? 'particles' : t < T ? 'morphing in' : t > L - T ? 'dissolving' : 'footage';
+    const phase = !this.hasMedia ? 'particles' : t < T ? 'morphing in' : t > L - T ? 'dissolving' : this.hasPhotos ? 'photos' : 'footage';
     this.ui.time.textContent = `${Math.floor(t)}s / ${Math.round(L)}s · ${phase}`;
   }
 }

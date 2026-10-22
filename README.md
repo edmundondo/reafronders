@@ -2,7 +2,7 @@
 
 A generative art map in the spirit of Refik Anadol's machine-intelligence work. Thousands of light particles drift in curl-noise currents across the shape of Africa and gather around each natural wonder. Every wonder has its own colour and motion: Victoria Falls *cascades*, Chinhoyi's Sleeping Pool *sinks* in a spiral, the Matobo granite *orbits*, and Mount Nyangani rises as *mist*.
 
-**Starts with Zimbabwe (11 wonders).** Any other African country can be added from the built-in **Studio**.
+**Starts with Zimbabwe: 14 entries.** These are natural wonders, plus **Great Zimbabwe** (heritage), the **Flame Lily** (flora) and the **Cave Squeaker** frog (fauna). Any other African country can be added from the built-in **Studio**.
 
 Backend (Supabase): **[reafrondersbe](https://github.com/edmundondo/reafrondersbe)**
 
@@ -55,7 +55,12 @@ Open any wonder and press **▶ Enter virtual tour**, or link straight to one wi
 | Loop | 15 / 30 / 45 / 60 s | Loop length |
 | ⛶ (F) | Fullscreen, for projection | Lights down |
 
-**Footage now:** Victoria Falls, Batoka Gorge (stand-in aerial), Mana Pools (Boswell the elephant), and Hwange (stand-in Mana Pools herd). All of it comes from Wikimedia Commons under CC licences, and the credits show on screen. The other seven wonders show "footage coming soon" with a living particle swarm.
+**Media now:**
+- **Video:** Victoria Falls, Batoka Gorge (stand-in aerial), Mana Pools (Boswell the elephant), and Hwange (stand-in Mana Pools herd).
+- **Photo loops** for nine more: 2–3 openly licensed photos each, with a slow drift and crossfade, morphing in and out of the particles like footage.
+- **Swarm only:** the Chimanimani Mountains and the Cave Squeaker, which have no open media yet.
+
+Every photo and clip credit shows on screen.
 
 **To add or swap footage:** go to **Studio → Edit** on a wonder, then **Virtual tour footage**. Paste a direct `.webm`/`.mp4` URL plus credit, licence, source page and start time, then **▶ Preview tour**. Wikimedia Commons links allow the colour-morph. Other hosts without CORS will just crossfade.
 
@@ -104,6 +109,8 @@ data/africa.geojson 56 African territories, from Natural Earth via world-atlas (
 ## Replicate it
 
 - **Skill:** `.claude/skills/living-atlas/SKILL.md` is the complete recipe: map data, schema and RLS, the art engine, the floating player, Journey, the footage rules, testing and shipping.
+- **Skill:** `.claude/skills/open-media-harvest/SKILL.md` covers the open-data rules: licences, relevance, location truth, two sources, and review before merge.
+- **Agent:** `.claude/agents/media-harvester.md` finds and verifies footage, photos and facts using the harvester in `reafrondersbe/tools/harvest` (Wikidata, Commons, UNESCO, GBIF, iNaturalist, NASA).
 - **Agent:** `.claude/agents/atlas-replicator.md` extends the atlas or clones it to a new country, region or theme. It researches verified sites, sources CC footage, writes the seed, tests and ships. Try asking Claude Code in this repo to "use the atlas-replicator agent to add Botswana".
 
 ## Open-source credits

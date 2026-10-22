@@ -1,9 +1,9 @@
 // ReAfronders · app shell: map, story panel, tour, and the Studio editor.
-import { Art, PALETTES, MODES, MOTIONS } from './art.js?v=20261022b';
-import { createStore, slugify } from './store.js?v=20261022b';
-import { Tour } from './tour.js?v=20261022b';
+import { Art, PALETTES, MODES, MOTIONS } from './art.js?v=20261022c';
+import { createStore, slugify } from './store.js?v=20261022c';
+import { Tour } from './tour.js?v=20261022c';
 
-const CATEGORIES = ['waterfall', 'mountain', 'gorge', 'rock', 'cave', 'wetland', 'river', 'lake', 'forest', 'desert', 'savanna', 'coast', 'volcano', 'landform'];
+const CATEGORIES = ['waterfall', 'mountain', 'gorge', 'rock', 'cave', 'wetland', 'river', 'lake', 'forest', 'desert', 'savanna', 'coast', 'volcano', 'landform', 'heritage', 'flora', 'fauna'];
 const DEFAULT_PALETTE = ['#2EC4B6', '#F4D35E', '#EE964B', '#C2185B', '#7BDFF2'];
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -167,11 +167,13 @@ function renderPanel() {
       <div class="kicker">${esc(w.category)} · ${esc(countryName(w.country_iso))}</div>
       <h2>${esc(w.name)}</h2>
       ${w.local_name ? `<div class="local">${esc(w.local_name)}</div>` : ''}
+      ${w.scientific_name ? `<div class="sci"><i>${esc(w.scientific_name)}</i></div>` : ''}
       <div class="chips">${w.unesco ? '<span class="chip unesco">UNESCO World Heritage</span>' : ''}<span class="chip">${esc(w.art?.motion || 'orbit')}</span></div>
       ${w.stat_value ? `<div class="stat"><b>${esc(w.stat_value)}</b><span>${esc(w.stat_label || '')}</span></div>` : ''}
       <p>${esc(w.summary)}</p>
       ${w.uniqueness ? `<p class="unique">${esc(w.uniqueness)}</p>` : ''}
-      <button class="accent tour-btn" data-act="tour">${w.media?.video ? '▶ Enter virtual tour' : '◌ Virtual tour (footage coming soon)'}</button>
+      <button class="accent tour-btn" data-act="tour">${w.media?.video ? '▶ Enter virtual tour' : w.media?.images?.length ? `▶ Enter virtual tour · ${w.media.images.length} photo${w.media.images.length > 1 ? 's' : ''}` : '◌ Virtual tour (swarm only — media coming)'}</button>
+      ${(w.citations || []).length ? `<details class="srcs"><summary>Sources (${w.citations.length})</summary><ul>${w.citations.map(u => { let h = u; try { h = new URL(u).hostname.replace(/^www\./, ''); } catch { } return `<li><a href="${esc(u)}" target="_blank" rel="noopener">${esc(h)}</a></li>`; }).join('')}</ul></details>` : ''}
       <p class="note">${Math.abs(w.lat).toFixed(3)}°${w.lat < 0 ? 'S' : 'N'}, ${Math.abs(w.lng).toFixed(3)}°${w.lng < 0 ? 'W' : 'E'}</p>`;
   } else if (view.focus) {
     const c = countryOf(view.focus), list = wondersIn(view.focus);
@@ -311,6 +313,7 @@ function wonderForm(d) {
     <div class="lbl">${d.id ? 'Edit wonder' : 'New wonder'} · ${esc(countryName(d.country_iso))}</div>
     <div class="field"><label for="w-name">Name *</label><input type="text" id="w-name" value="${esc(d.name)}" required></div>
     <div class="field"><label for="w-local">Local name / meaning</label><input type="text" id="w-local" value="${esc(d.local_name || '')}"></div>
+    <div class="field"><label for="w-sci">Scientific name (flora / fauna)</label><input type="text" id="w-sci" value="${esc(d.scientific_name || '')}" placeholder="e.g. Gloriosa superba"></div>
     <div class="row">
       <div class="field"><label for="w-cat">Category</label><select id="w-cat">${CATEGORIES.map(c => `<option ${c === d.category ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
       <div class="field"><label for="w-order">Order</label><input type="number" id="w-order" value="${esc(d.sort_order)}"></div>
@@ -322,6 +325,7 @@ function wonderForm(d) {
     <div class="btnrow" style="margin:-4px 0 12px"><button data-act="pick">⌖ Pick on map</button></div>
     <div class="field"><label for="w-sum">Brief description *</label><textarea id="w-sum">${esc(d.summary)}</textarea></div>
     <div class="field"><label for="w-uni">What makes it unique</label><textarea id="w-uni">${esc(d.uniqueness || '')}</textarea></div>
+    <div class="field"><label for="w-cite">Sources (one URL per line — aim for 2+ independent)</label><textarea id="w-cite" placeholder="https://whc.unesco.org/en/list/364/">${esc((d.citations || []).join('\n'))}</textarea></div>
     <div class="row">
       <div class="field"><label for="w-sl">Stat label</label><input type="text" id="w-sl" value="${esc(d.stat_label || '')}" placeholder="Height"></div>
       <div class="field"><label for="w-sv">Stat value</label><input type="text" id="w-sv" value="${esc(d.stat_value || '')}" placeholder="2,592 m"></div>
@@ -347,6 +351,8 @@ function wonderForm(d) {
       <div class="field"><label for="m-start">Start at (s)</label><input type="number" id="m-start" min="0" step="0.5" value="${esc(m.start ?? 0)}"></div>
       <div class="field"><label for="m-note">Note</label><input type="text" id="m-note" value="${esc(m.note || '')}" placeholder="e.g. stand-in footage"></div>
     </div>
+    <div class="field"><label for="m-images">Photo loop — one per line: url | credit | licence | source page</label><textarea id="m-images" placeholder="https://upload.wikimedia.org/... | Photographer | CC BY-SA 4.0 | https://commons.wikimedia.org/wiki/File:...">${esc((m.images || []).map(i => [i.url, i.credit, i.license, i.source].map(x => x || '').join(' | ')).join('\n'))}</textarea></div>
+    <p class="note">Used when there is no video (or it fails). Find openly licensed media with the harvester: <code>reafrondersbe/tools/harvest</code>.</p>
     <div class="btnrow" style="margin-bottom:12px"><button data-act="preview-tour">▶ Preview tour</button></div>
     <div class="btnrow"><button class="accent" data-act="save">Save wonder</button><button data-act="cancel">Cancel</button></div>`;
 }
@@ -354,12 +360,13 @@ function wonderForm(d) {
 function readForm(el) {
   const d = view.draft, v = (id) => $(id, el).value;
   Object.assign(d, {
-    name: v('#w-name').trim(), local_name: v('#w-local').trim() || null, category: v('#w-cat'), sort_order: +v('#w-order') || 0,
+    name: v('#w-name').trim(), local_name: v('#w-local').trim() || null, scientific_name: v('#w-sci').trim() || null,
+    citations: v('#w-cite').split('\n').map(x => x.trim()).filter(x => /^https?:\/\//.test(x)), category: v('#w-cat'), sort_order: +v('#w-order') || 0,
     lat: +v('#w-lat'), lng: +v('#w-lng'), summary: v('#w-sum').trim(), uniqueness: v('#w-uni').trim() || null,
     stat_label: v('#w-sl').trim() || null, stat_value: v('#w-sv').trim() || null,
     unesco: $('#w-unesco', el).checked, visible: $('#w-vis', el).checked,
     art: { color: v('#w-color').toUpperCase(), motion: v('#w-motion'), intensity: +v('#w-int') },
-    media: Object.fromEntries(Object.entries({ video: v('#m-video').trim(), fallback: v('#m-fallback').trim(), credit: v('#m-credit').trim(), license: v('#m-license').trim(), source: v('#m-source').trim(), start: +v('#m-start') || 0, note: v('#m-note').trim() }).filter(([k, x]) => x !== '' && !(k === 'start' && x === 0))),
+    media: Object.fromEntries(Object.entries({ images: v('#m-images').split('\n').map(l => l.split('|').map(x => x.trim())).filter(([u]) => /^https?:\/\//.test(u || '')).map(([url, credit, license, source]) => ({ url, credit, license, source })), video: v('#m-video').trim(), fallback: v('#m-fallback').trim(), credit: v('#m-credit').trim(), license: v('#m-license').trim(), source: v('#m-source').trim(), start: +v('#m-start') || 0, note: v('#m-note').trim() }).filter(([k, x]) => x !== '' && !(k === 'start' && x === 0) && !(Array.isArray(x) && !x.length))),
   });
   return d;
 }

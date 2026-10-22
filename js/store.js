@@ -1,7 +1,7 @@
 // Data layer — one interface, two "sound systems":
 //  • supabase: the club PA (shared, live, everyone hears it)
 //  • local:    headphones (your browser only; export/import JSON to share)
-import { CONFIG } from './config.js?v=20261022b';
+import { CONFIG } from './config.js?v=20261022c';
 
 const LS_KEY = 'reafronders:v1';
 const lsGet = () => { try { return JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch { return null; } };
@@ -9,12 +9,12 @@ const lsSet = (v) => { try { localStorage.setItem(LS_KEY, JSON.stringify(v)); } 
 const lsDel = () => { try { localStorage.removeItem(LS_KEY); } catch { } };
 
 export const slugify = (s) => String(s).toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 60);
-const WONDER_COLS = ['slug', 'country_iso', 'name', 'local_name', 'category', 'lat', 'lng', 'summary', 'uniqueness', 'stat_label', 'stat_value', 'unesco', 'visible', 'sort_order', 'art', 'media'];
+const WONDER_COLS = ['slug', 'country_iso', 'name', 'local_name', 'category', 'lat', 'lng', 'summary', 'uniqueness', 'stat_label', 'stat_value', 'unesco', 'visible', 'sort_order', 'art', 'media', 'scientific_name', 'citations'];
 const COUNTRY_COLS = ['iso_a3', 'name', 'region', 'tagline', 'palette', 'active', 'sort_order'];
 const pick = (o, keys) => Object.fromEntries(keys.filter(k => k in o).map(k => [k, o[k]]));
 
 export async function createStore() {
-  const seed = await (await fetch('data/seed.json?v=20261022b')).json();
+  const seed = await (await fetch('data/seed.json?v=20261022c')).json();
   const forceLocal = new URLSearchParams(location.search).has('local');
   let sb = null, session = null, isEditor = false, mode = 'local';
 
