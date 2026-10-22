@@ -1,7 +1,7 @@
 // ReAfronders · app shell: map, story panel, tour, and the Studio editor.
-import { Art, PALETTES, MODES, MOTIONS } from './art.js?v=20261022e';
-import { createStore, slugify } from './store.js?v=20261022e';
-import { Tour } from './tour.js?v=20261022e';
+import { Art, PALETTES, MODES, MOTIONS } from './art.js?v=20261022f';
+import { createStore, slugify } from './store.js?v=20261022f';
+import { Tour } from './tour.js?v=20261022f';
 
 const CATEGORIES = ['waterfall', 'mountain', 'gorge', 'rock', 'cave', 'wetland', 'river', 'lake', 'forest', 'desert', 'savanna', 'coast', 'volcano', 'landform', 'heritage', 'flora', 'fauna'];
 const DEFAULT_PALETTE = ['#2EC4B6', '#F4D35E', '#EE964B', '#C2185B', '#7BDFF2'];
@@ -643,8 +643,13 @@ function loop(now) {
 }
 
 // ── boot ───────────────────────────────────────────────────────────────────
+// A hidden or collapsed window can report a 0×0 viewport: wait for real size before drawing
+const hasSize = () => innerWidth > 0 && innerHeight > 0;
+const waitForSize = () => new Promise(res => { if (hasSize()) return res(); const f = () => { if (hasSize()) { removeEventListener('resize', f); res(); } }; addEventListener('resize', f); });
+
 async function init() {
   store = await createStore();
+  await waitForSize();
   const [data, g] = await Promise.all([store.load(), fetch('data/africa.geojson').then(r => r.json())]);
   Object.assign(state, data); geo = g;
   art = new Art($('#art'), $('#bloom'));
@@ -682,7 +687,7 @@ async function init() {
     $$('.tabs button').forEach(x => x.setAttribute('aria-selected', x === b));
     $$('.tab').forEach(t => t.hidden = t.dataset.tab !== b.dataset.tab);
   });
-  addEventListener('resize', () => { art.resize(); baseScale = fitParams(africaFC()).s; flyTo(view.focus ? fitOf(view.focus) : africaFC(), false); });
+  addEventListener('resize', () => { if (!hasSize()) return; art.resize(); baseScale = fitParams(africaFC()).s; flyTo(view.focus ? fitOf(view.focus) : africaFC(), false); });
 
   addEventListener('keydown', (e) => {
     if (J.token) { if (e.key === 'Escape' || e.key === 'j' || e.key === 'J') stopJourney(); return; }

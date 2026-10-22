@@ -62,7 +62,7 @@ export class Art {
 
   // Masks: a low-res stencil of the continent (and focused country) so particles know where "land" is.
   setMasks(path, landFeatures, focusFeature) {
-    const ms = 0.25, mw = Math.ceil(this.w * ms), mh = Math.ceil(this.h * ms);
+    const ms = 0.25, mw = Math.max(1, Math.ceil(this.w * ms)), mh = Math.max(1, Math.ceil(this.h * ms));
     const draw = (features) => {
       const oc = new OffscreenCanvasShim(mw, mh); const x = oc.ctx;
       x.setTransform(ms, 0, 0, ms, 0, 0); x.fillStyle = '#fff'; x.beginPath();
