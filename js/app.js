@@ -1,6 +1,7 @@
 // ReAfronders · app shell: map, story panel, tour, and the Studio editor.
 import { Art, PALETTES, MODES, MOTIONS } from './art.js';
 import { createStore, slugify } from './store.js';
+import { Tour } from './tour.js';
 
 const CATEGORIES = ['waterfall', 'mountain', 'gorge', 'rock', 'cave', 'wetland', 'river', 'lake', 'forest', 'desert', 'savanna', 'coast', 'volcano', 'landform'];
 const DEFAULT_PALETTE = ['#2EC4B6', '#F4D35E', '#EE964B', '#C2185B', '#7BDFF2'];
@@ -11,7 +12,7 @@ const isMobile = () => window.innerWidth <= 720;
 
 const state = { countries: [], wonders: [], presentation: {} };
 const view = { focus: null, selected: null, picking: false, tour: null, studio: false, draft: null, draftOriginal: null, edCountry: null };
-let store, geo, art, baseScale = 1, tween = null, frameNo = 0;
+let store, geo, art, tour, baseScale = 1, tween = null, frameNo = 0;
 
 const svg = d3.select('#map');
 const gC = svg.append('g'), gL = svg.append('g'), gW = svg.append('g');
@@ -154,6 +155,7 @@ function renderPanel() {
       ${w.stat_value ? `<div class="stat"><b>${esc(w.stat_value)}</b><span>${esc(w.stat_label || '')}</span></div>` : ''}
       <p>${esc(w.summary)}</p>
       ${w.uniqueness ? `<p class="unique">${esc(w.uniqueness)}</p>` : ''}
+      <button class="accent tour-btn" data-act="tour">${w.media?.video ? '▶ Enter virtual tour' : '◌ Virtual tour (footage coming soon)'}</button>
       <p class="note">${Math.abs(w.lat).toFixed(3)}°${w.lat < 0 ? 'S' : 'N'}, ${Math.abs(w.lng).toFixed(3)}°${w.lng < 0 ? 'W' : 'E'}</p>`;
   } else if (view.focus) {
     const c = countryOf(view.focus), list = wondersIn(view.focus);
@@ -178,6 +180,7 @@ function renderPanel() {
     if (b.dataset.iso) focus(b.dataset.iso);
     if (b.dataset.act === 'back') { view.selected = null; redraw(); renderPanel(); renderCrumbs(); }
     if (b.dataset.act === 'studio') openStudio(true);
+    if (b.dataset.act === 'tour') openTour(view.selected);
   };
 }
 
@@ -302,7 +305,7 @@ function ensureCountry(iso) {
 }
 
 function wonderForm(d) {
-  const a = d.art || {};
+  const a = d.art || {}, m = d.media || {};
   return `
     <div class="lbl">${d.id ? 'Edit wonder' : 'New wonder'} · ${esc(countryName(d.country_iso))}</div>
     <div class="field"><label for="w-name">Name *</label><input type="text" id="w-name" value="${esc(d.name)}" required></div>
@@ -329,6 +332,21 @@ function wonderForm(d) {
     <div class="row" style="margin:8px 0 12px"><input type="color" id="w-color" value="${esc(a.color || '#F4D35E')}" aria-label="Wonder colour">
       <select id="w-motion" aria-label="Motion">${MOTIONS.map(m => `<option ${m === a.motion ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
     <div class="slider"><label for="w-int">Intensity</label><output id="o-int">${(a.intensity ?? 0.8).toFixed(2)}</output><input type="range" id="w-int" min="0.1" max="2" step="0.05" value="${a.intensity ?? 0.8}"></div>
+    <hr>
+    <div class="lbl">Virtual tour footage</div>
+    <p class="note">A ~30 s loop. Use a direct .webm or .mp4 link; Wikimedia Commons files allow the colour-morph. Other hosts may only crossfade.</p>
+    <div class="field"><label for="m-video">Video URL</label><input type="text" id="m-video" value="${esc(m.video || '')}" placeholder="https://upload.wikimedia.org/...webm"></div>
+    <div class="field"><label for="m-fallback">Fallback URL (mp4, for Safari/iPhone)</label><input type="text" id="m-fallback" value="${esc(m.fallback || '')}"></div>
+    <div class="row">
+      <div class="field"><label for="m-credit">Credit</label><input type="text" id="m-credit" value="${esc(m.credit || '')}" placeholder="Filmmaker"></div>
+      <div class="field"><label for="m-license">Licence</label><input type="text" id="m-license" value="${esc(m.license || '')}" placeholder="CC BY-SA 4.0"></div>
+    </div>
+    <div class="field"><label for="m-source">Source page</label><input type="text" id="m-source" value="${esc(m.source || '')}"></div>
+    <div class="row">
+      <div class="field"><label for="m-start">Start at (s)</label><input type="number" id="m-start" min="0" step="0.5" value="${esc(m.start ?? 0)}"></div>
+      <div class="field"><label for="m-note">Note</label><input type="text" id="m-note" value="${esc(m.note || '')}" placeholder="e.g. stand-in footage"></div>
+    </div>
+    <div class="btnrow" style="margin-bottom:12px"><button data-act="preview-tour">▶ Preview tour</button></div>
     <div class="btnrow"><button class="accent" data-act="save">Save wonder</button><button data-act="cancel">Cancel</button></div>`;
 }
 
@@ -340,6 +358,7 @@ function readForm(el) {
     stat_label: v('#w-sl').trim() || null, stat_value: v('#w-sv').trim() || null,
     unesco: $('#w-unesco', el).checked, visible: $('#w-vis', el).checked,
     art: { color: v('#w-color').toUpperCase(), motion: v('#w-motion'), intensity: +v('#w-int') },
+    media: Object.fromEntries(Object.entries({ video: v('#m-video').trim(), fallback: v('#m-fallback').trim(), credit: v('#m-credit').trim(), license: v('#m-license').trim(), source: v('#m-source').trim(), start: +v('#m-start') || 0, note: v('#m-note').trim() }).filter(([k, x]) => x !== '' && !(k === 'start' && x === 0))),
   });
   return d;
 }
@@ -353,6 +372,7 @@ function bindWonderForm(el) {
   el.onclick = async (e) => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.act === 'pick') startPick();
+    if (b.dataset.act === 'preview-tour') { const d = readForm(el); openTour(null, { ...d, id: d.id || '__draft' }); }
     if (b.dataset.act === 'cancel') { cancelPick(); revertDraft(); renderWondersTab(); }
     if (b.dataset.act === 'save') {
       const d = readForm(el);
@@ -453,6 +473,14 @@ function renderDataTab() {
   };
 }
 
+// ── virtual tour ───────────────────────────────────────────────────────────
+function openTour(id, draft) {
+  const w = draft || state.wonders.find(x => x.id === id); if (!w) return;
+  stopTour(); hideTip();
+  const p = projection([w.lng, w.lat]);
+  tour.show(w, { x: p[0], y: p[1] });
+}
+
 // ── main loop ──────────────────────────────────────────────────────────────
 let last = performance.now();
 function loop(now) {
@@ -461,7 +489,7 @@ function loop(now) {
     const k = Math.min(1, (now - tween.start) / tween.dur); tween.step(d3.easeCubicInOut(k));
     const done = k >= 1; redraw(done || frameNo % 5 === 0); if (done) tween = null;
   }
-  if (!document.hidden) art.frame(dt);
+  if (!document.hidden && !(tour && tour.open)) art.frame(dt);
   frameNo++; requestAnimationFrame(loop);
 }
 
@@ -471,12 +499,20 @@ async function init() {
   const [data, g] = await Promise.all([store.load(), fetch('data/africa.geojson').then(r => r.json())]);
   Object.assign(state, data); geo = g;
   art = new Art($('#art'), $('#bloom'));
+  tour = new Tour({
+    noise: art.noise,
+    getList: () => visibleWonders().sort((a, b) => a.country_iso.localeCompare(b.country_iso) || (a.sort_order ?? 0) - (b.sort_order ?? 0)),
+    onChange: (w) => { if (w.id !== '__draft' && w.id !== view.selected && state.wonders.some(x => x.id === w.id)) select(w.id); },
+    onClose: () => { last = performance.now(); },
+  });
+  const deep = new URLSearchParams(location.search).get('tour');
   baseScale = fitParams(africaFC()).s;
   applyPresentation(); drawCountries(); flyTo(africaFC(), false);
   renderPanel(); renderCrumbs();
   requestAnimationFrame(loop);
   const start = new URLSearchParams(location.search).get('country') ?? state.presentation.focusCountry;
   if (start && featureOf(start)) setTimeout(() => focus(start), 900);
+  if (deep) { const w = state.wonders.find(x => x.slug === deep); if (w) setTimeout(() => openTour(w.id), 1400); }
 
   $('#btn-africa').onclick = home;
   $('#btn-tour').onclick = () => view.tour ? stopTour() : startTour();
@@ -490,6 +526,7 @@ async function init() {
   addEventListener('resize', () => { art.resize(); baseScale = fitParams(africaFC()).s; flyTo(view.focus ? featureOf(view.focus) : africaFC(), false); });
   document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) document.body.classList.remove('exhibit'); });
   addEventListener('keydown', (e) => {
+    if (tour?.open) return;
     if (e.target.matches('input, textarea, select')) { if (e.key === 'Escape') e.target.blur(); return; }
     if (e.key === 'Escape') { if (view.picking) cancelPick(); else if (document.body.classList.contains('exhibit')) toggleExhibit(); else if (view.selected) { view.selected = null; redraw(); renderPanel(); renderCrumbs(); } else if (view.focus) home(); }
     if (e.key === 's' || e.key === 'S') view.studio ? closeStudio() : openStudio();

@@ -35,6 +35,30 @@ Where edits are saved:
 Keys: `T` tour · `E` exhibition (fullscreen auto-tour, made for a projector or LED wall) · `Esc` back.
 URL tricks: `?country=ZWE` opens on a country, `?country=` opens on the whole continent, `?local` ignores Supabase.
 
+## Virtual tours (30-second footage loops)
+
+Open any wonder and press **▶ Enter virtual tour**, or link straight to one with `?tour=victoria-falls`. Here's what happens over the loop:
+
+1. **Bloom (0–1.4 s):** the wonder's particles burst out from its point on the map.
+2. **Learn (to ~4 s):** each particle samples the colour under it in the footage and flows along the image's edges, like brush strokes painting the scene.
+3. **Resolve:** the real footage sharpens up out of the swarm.
+4. **Dissolve:** near the end of the loop it melts back into particles, then the cycle restarts.
+
+| Control | What it does | DJ analogy |
+|---|---|---|
+| ⏮ ⏭ | Previous / next wonder | Load the next deck |
+| ❚❚ / ▶ (Space) | Pause / play | Cue |
+| 🔇 / 🔊 (M) | Sound | Channel mute |
+| ⟲ Morph (R) | Replay the particles-to-footage morph | Spin-back |
+| Veil | How much particle "veil" stays over the footage | Wet/dry |
+| Blend | Length of the morph, 1–8 s | Crossfader curve |
+| Loop | 15 / 30 / 45 / 60 s | Loop length |
+| ⛶ (F) | Fullscreen, for projection | Lights down |
+
+**Footage now:** Victoria Falls, Batoka Gorge (stand-in aerial), Mana Pools (Boswell the elephant), and Hwange (stand-in Mana Pools herd). All of it comes from Wikimedia Commons under CC licences, and the credits show on screen. The other seven wonders show "footage coming soon" with a living particle swarm.
+
+**To add or swap footage:** go to **Studio → Edit** on a wonder, then **Virtual tour footage**. Paste a direct `.webm`/`.mp4` URL plus credit, licence, source page and start time, then **▶ Preview tour**. Wikimedia Commons links allow the colour-morph. Other hosts without CORS will just crossfade.
+
 ## Host it on GitHub Pages (free)
 
 1. Push this repo.
@@ -54,6 +78,7 @@ index.html          page shell
 css/style.css       smoked-glass UI over the artwork
 js/art.js           the generative engine (simplex curl noise, emitters, bloom)
 js/app.js           map, story panel, tour, Studio editor
+js/tour.js          virtual-tour viewer: particle↔footage morph + controls
 js/store.js         data layer: Supabase or local browser storage
 js/config.js        your Supabase URL + key
 data/seed.json      Zimbabwe content (same file as the backend seed)

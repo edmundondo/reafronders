@@ -9,7 +9,7 @@ const lsSet = (v) => { try { localStorage.setItem(LS_KEY, JSON.stringify(v)); } 
 const lsDel = () => { try { localStorage.removeItem(LS_KEY); } catch { } };
 
 export const slugify = (s) => String(s).toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 60);
-const WONDER_COLS = ['slug', 'country_iso', 'name', 'local_name', 'category', 'lat', 'lng', 'summary', 'uniqueness', 'stat_label', 'stat_value', 'unesco', 'visible', 'sort_order', 'art'];
+const WONDER_COLS = ['slug', 'country_iso', 'name', 'local_name', 'category', 'lat', 'lng', 'summary', 'uniqueness', 'stat_label', 'stat_value', 'unesco', 'visible', 'sort_order', 'art', 'media'];
 const COUNTRY_COLS = ['iso_a3', 'name', 'region', 'tagline', 'palette', 'active', 'sort_order'];
 const pick = (o, keys) => Object.fromEntries(keys.filter(k => k in o).map(k => [k, o[k]]));
 

@@ -47,6 +47,32 @@
     <section class="tab" data-tab="data" hidden></section>
   </aside>
 
+  <section id="tour" aria-label="Virtual tour" hidden>
+    <video id="tour-video" crossorigin="anonymous" muted playsinline loop preload="auto"></video>
+    <canvas id="tour-canvas" aria-hidden="true"></canvas>
+    <div class="t-top">
+      <div><div class="t-kick"></div><h2 class="t-name"></h2><div class="t-note"></div></div>
+      <button class="ghost t-x" data-t="close" aria-label="Close tour">✕</button>
+    </div>
+    <p class="t-empty" hidden></p>
+    <div class="t-controls">
+      <div class="t-progress" role="slider" aria-label="Loop position"><div class="t-fill"></div></div>
+      <div class="t-row">
+        <button data-t="prev" aria-label="Previous wonder">⏮</button>
+        <button data-t="play" aria-label="Pause">❚❚</button>
+        <button data-t="next" aria-label="Next wonder">⏭</button>
+        <button data-t="mute" aria-label="Unmute">🔇</button>
+        <button data-t="remorph" title="Replay the morph (R)">⟲ Morph</button>
+        <span class="t-time"></span>
+        <label class="t-knob">Veil <input type="range" id="t-morph" min="0" max="1" step="0.01" aria-label="Particle veil over footage"></label>
+        <label class="t-knob">Blend <input type="range" id="t-trans" min="1" max="8" step="0.5" aria-label="Morph transition seconds"></label>
+        <label class="t-knob">Loop <select id="t-loop" aria-label="Loop length"><option value="15">15s</option><option value="30">30s</option><option value="45">45s</option><option value="60">60s</option></select></label>
+        <button data-t="full" aria-label="Fullscreen (F)">⛶</button>
+      </div>
+      <div class="t-credit"></div>
+    </div>
+  </section>
+
   <div id="toast" role="status"></div>
   <div id="pickhint" hidden>Click the map to place the wonder · <kbd>Esc</kbd> to cancel</div>
 

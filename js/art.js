@@ -5,7 +5,7 @@
 // reverb tail, glow = master gain, bpm = the pulse everything can lock to.
 
 // ── Simplex noise (Gustavson, public domain) ────────────────────────────────
-function makeNoise(seed = 7) {
+export function makeNoise(seed = 7) {
   const p = new Uint8Array(256).map((_, i) => i);
   let s = seed >>> 0;
   const rnd = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
