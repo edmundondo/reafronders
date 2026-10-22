@@ -2,7 +2,7 @@
 
 A generative art map in the spirit of Refik Anadol's machine-intelligence work. Thousands of light particles drift in curl-noise currents across the shape of Africa and gather around each natural wonder. Every wonder has its own colour and motion: Victoria Falls *cascades*, Chinhoyi's Sleeping Pool *sinks* in a spiral, the Matobo granite *orbits*, and Mount Nyangani rises as *mist*.
 
-**7 countries, 85 entries.** Zimbabwe (15), Botswana (10), South Africa (19), Namibia (11), Malawi (10), Zambia (11) and Mozambique (9). Each country has its top natural wonders, every UNESCO World Heritage site, a signature plant and a signature animal, with a colour palette taken from its land. Any other African country can be added from the built-in **Studio**.
+**7 countries, 86 entries.** Zimbabwe (16), Botswana (10), South Africa (19), Namibia (11), Malawi (10), Zambia (11) and Mozambique (9). Each country has its top natural wonders, every UNESCO World Heritage site, a signature plant and a signature animal, with a colour palette taken from its land. Any other African country can be added from the built-in **Studio**.
 
 Backend (Supabase): **[reafrondersbe](https://github.com/edmundondo/reafrondersbe)**
 
