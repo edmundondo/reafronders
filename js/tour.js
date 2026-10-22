@@ -4,6 +4,7 @@
 // footage — each particle samples the colour under it and flows along the image's
 // edges — then the video resolves out of the swarm and later dissolves back.
 // DJ terms: particles = outgoing track, footage = incoming track, Veil = wet/dry.
+import { BRAND } from './config.js?v=20261022h';
 
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const hexRGB = (h) => { const n = parseInt((h || '#ffffff').slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
@@ -167,6 +168,7 @@ export class Tour {
   }
 
   load(w) {
+    this.current = w;
     this.w0 = w; this.t = 0; this.pixels = null; this.sampleOK = false; this.hasVideo = false; this.hasPhotos = false; this.doneSent = false;
     this.images = (w.media?.images || []).filter(x => x && x.url); this.slot = -1;
     this.base = hexRGB(w.art?.color); this.motion = w.art?.motion || 'orbit';
@@ -182,7 +184,7 @@ export class Tour {
     this.ui.kick.textContent = this.journey?.caption || `${w.category} · virtual tour`;
     this.ui.name.textContent = w.name;
     this.ui.note.textContent = m.note || '';
-    this.ui.credit.innerHTML = m.video ? `Footage: ${esc(m.credit || 'unknown')} · ${m.source ? `<a href="${esc(m.source)}" target="_blank" rel="noopener">${esc(m.license || 'source')}</a>` : esc(m.license || '')}` : '';
+    this.ui.credit.innerHTML = m.video ? `Footage: ${esc(m.credit || 'unknown')} · ${m.source ? `<a href="${esc(m.source)}" target="_blank" rel="noopener">${esc(m.license || 'source')}</a>` : esc(m.license || '')}${licenseLink(m.license, w.name)}` : '';
     this.video.pause(); this.video.removeAttribute('src'); this.video.innerHTML = '';
     this.video.style.opacity = 0; this.photos.style.opacity = 0; this.ph.forEach(im => { im.style.opacity = 0; im.removeAttribute('src'); });
     if (m.video) {
@@ -213,7 +215,7 @@ export class Tour {
     const swap = () => { back.style.opacity = 1; this.ph[this.front].style.opacity = 0; this.front = 1 - this.front; };
     if (back.getAttribute('src') !== img.url) { back.onload = swap; back.src = img.url; } else if (back.complete) swap(); else back.onload = swap;
     const n = this.images.length;
-    this.ui.credit.innerHTML = `Photo ${n > 1 ? `${i + 1}/${n}: ` : ''}${esc(img.credit || 'unknown')} · ${img.source ? `<a href="${esc(img.source)}" target="_blank" rel="noopener">${esc(img.license || 'source')}</a>` : esc(img.license || '')}`;
+    this.ui.credit.innerHTML = `Photo ${n > 1 ? `${i + 1}/${n}: ` : ''}${esc(img.credit || 'unknown')} · ${img.source ? `<a href="${esc(img.source)}" target="_blank" rel="noopener">${esc(img.license || 'source')}</a>` : esc(img.license || '')}${licenseLink(img.license, this.current?.name)}`;
   }
   kenBurns(t, L) {
     const n = this.images.length, slotLen = L / n, slot = Math.min(n - 1, Math.floor(t / slotLen));
@@ -371,3 +373,10 @@ export class Tour {
 }
 
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+// Footage the artist owns (licence starts with ©) gets a direct licensing link
+function licenseLink(license, place) {
+  if (!/^©/.test(license || '') || !BRAND?.email) return '';
+  const subject = encodeURIComponent(`Footage licence: ${place || 'Futurart'}`);
+  return ` <a class="lic" href="mailto:${BRAND.email}?subject=${subject}">License this footage</a>`;
+}

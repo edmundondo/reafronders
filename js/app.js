@@ -1,7 +1,9 @@
 // ReAfronders · app shell: map, story panel, tour, and the Studio editor.
-import { Art, PALETTES, MODES, MOTIONS } from './art.js?v=20261022g';
-import { createStore, slugify } from './store.js?v=20261022g';
-import { Tour } from './tour.js?v=20261022g';
+import { Art, PALETTES, MODES, MOTIONS } from './art.js?v=20261022h';
+import { createStore, slugify } from './store.js?v=20261022h';
+import { Tour } from './tour.js?v=20261022h';
+import { Recorder } from './recorder.js?v=20261022h';
+import { BRAND } from './config.js?v=20261022h';
 
 const CATEGORIES = ['waterfall', 'mountain', 'gorge', 'rock', 'cave', 'wetland', 'river', 'lake', 'forest', 'desert', 'savanna', 'coast', 'volcano', 'landform', 'heritage', 'flora', 'fauna'];
 const DEFAULT_PALETTE = ['#2EC4B6', '#F4D35E', '#EE964B', '#C2185B', '#7BDFF2'];
@@ -13,7 +15,7 @@ const isMobile = () => window.innerWidth <= 720;
 const state = { countries: [], wonders: [], presentation: {} };
 const view = { focus: null, selected: null, picking: false, studio: false, draft: null, draftOriginal: null, edCountry: null, traveller: null };
 const J = { token: null, travel: null, routes: [] };
-let store, geo, art, tour, baseScale = 1, tween = null, frameNo = 0;
+let rec, store, geo, art, tour, baseScale = 1, tween = null, frameNo = 0;
 
 const svg = d3.select('#map');
 const gC = svg.append('g'), gR = svg.append('g'), gL = svg.append('g'), gW = svg.append('g');
@@ -109,10 +111,16 @@ function redraw(rebuildMask = false) {
   });
 
   // country labels at continent scale
-  const labels = view.focus ? [] : [...act].map(iso => ({ iso, f: featureOf(iso) })).filter(d => d.f);
+  // Continent view: country labels stack in a column out at sea, with leader lines, so neighbours never collide
+  const labels = view.focus ? [] : [...act].map(iso => ({ iso, f: featureOf(iso) })).filter(d => d.f)
+    .map(d => ({ ...d, c: path.centroid(fitOf(d.iso)), b: path.bounds(fitOf(d.iso)) })).sort((a, b) => a.c[1] - b.c[1]);
+  const colX = labels.length ? Math.max(...labels.map(d => d.b[1][0])) + 28 : 0;
+  let yPrev = -Infinity; for (const d of labels) { d.y = Math.max(d.c[1], yPrev + 22); yPrev = d.y; }
+  gL.selectAll('path.cline').data(labels, d => d.iso).join('path').attr('class', 'cline')
+    .attr('d', d => `M${d.c[0]},${d.c[1]} L${colX - 14},${d.y - 4} L${colX - 4},${d.y - 4}`);
   gL.selectAll('text').data(labels, d => d.iso).join('text').attr('class', 'clabel')
     .attr('text-anchor', 'start')
-    .attr('transform', d => { const b = path.bounds(d.f), c = path.centroid(d.f); return `translate(${b[1][0] + 10},${c[1] + 5})`; })
+    .attr('transform', d => `translate(${colX},${d.y})`)
     .text(d => `${countryName(d.iso)} · ${wondersIn(d.iso).length}`);
 
   redrawEmitters(vw);
@@ -676,6 +684,34 @@ async function init() {
     setTimeout(() => startJourney(), 1600);
   }
 
+  // ── Clip recorder (Reels / TikTok / YouTube) ──
+  rec = new Recorder({
+    art, tourEl: $('#tour'), brand: BRAND, toast,
+    title: () => tour.open ? (tour.current?.name || '') : J.token ? $('.j-site').textContent : view.selected ? (state.wonders.find(w => w.id === view.selected)?.name || '') : view.focus ? countryName(view.focus) : 'Africa',
+    overlay: (ctx) => {   // pins (the SVG map isn't in the canvas, so redraw the dots + focused labels)
+      for (const w of visibleWonders()) {
+        const p = projection([w.lng, w.lat]); if (!p || p[0] < -20 || p[1] < -20 || p[0] > innerWidth + 20 || p[1] > innerHeight + 20) continue;
+        ctx.beginPath(); ctx.arc(p[0], p[1], w.id === view.selected ? 5 : 3.4, 0, 7); ctx.fillStyle = w.art?.color || '#fff'; ctx.fill();
+        ctx.beginPath(); ctx.arc(p[0], p[1], 8, 0, 7); ctx.strokeStyle = (w.art?.color || '#fff') + '99'; ctx.lineWidth = 1; ctx.stroke();
+        if (w.country_iso === view.focus && !tour.open) { ctx.font = '500 11px "Space Grotesk", system-ui, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.fillText(w.name, p[0] + 10, p[1] + 4); }
+      }
+    },
+    startJourney: (spec) => { const cat = spec.split(':')[1] || 'all'; state.presentation.journeyCategory = cat; startJourney(); },
+    stopJourney,
+  });
+  $('#btn-record').onclick = () => {
+    if (!Recorder.supported()) return toast('This browser cannot record video — try Chrome, Edge or Safari 17+.');
+    const sel = $('#rec-what'); const cats = [...new Set(visibleWonders().map(w => w.category))].sort();
+    sel.innerHTML = `<option value="view">What's on screen now${tour.open ? ` · ${esc(tour.current?.name || 'tour')}` : ''}</option><option value="journey:all">Journey · all categories</option>` + cats.map(c => `<option value="journey:${c}">Journey · ${c}</option>`).join('');
+    $('#rec-dialog').showModal();
+  };
+  $('#rec-dialog').addEventListener('close', async () => {
+    if ($('#rec-dialog').returnValue !== 'go') return;
+    const what = $('#rec-what').value, opts = { fmt: $('#rec-fmt').value, seconds: +$('#rec-len').value, journey: what.startsWith('journey') ? what : null, audioFile: $('#rec-audio').files[0] || null, signature: $('#rec-sign').checked };
+    for (const n of [3, 2, 1]) { toast(`Recording in ${n}…`); await sleep(1000); }
+    rec.start(opts);
+  });
+
   $('#btn-africa').onclick = home;
   $('#btn-journey').onclick = () => J.token ? stopJourney() : startJourney();
   $('#btn-exhibit').onclick = () => startJourney({ fullscreen: true });
@@ -690,6 +726,7 @@ async function init() {
   addEventListener('resize', () => { if (!hasSize()) return; art.resize(); baseScale = fitParams(africaFC()).s; flyTo(view.focus ? fitOf(view.focus) : africaFC(), false); });
 
   addEventListener('keydown', (e) => {
+    if (rec?.active && e.key === 'Escape') { rec.stop(); return; }
     if (J.token) { if (e.key === 'Escape' || e.key === 'j' || e.key === 'J') stopJourney(); return; }
     if (tour?.open) return;
     if (e.target.matches('input, textarea, select')) { if (e.key === 'Escape') e.target.blur(); return; }

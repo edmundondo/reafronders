@@ -4,6 +4,8 @@ A generative art map in the spirit of Refik Anadol's machine-intelligence work. 
 
 **7 countries, 86 entries.** Zimbabwe (16), Botswana (10), South Africa (19), Namibia (11), Malawi (10), Zambia (11) and Mozambique (9). Each country has its top natural wonders, every UNESCO World Heritage site, a signature plant and a signature animal, with a colour palette taken from its land. Any other African country can be added from the built-in **Studio**.
 
+**Futurart by Edward Mundondo.** ● Record exports Reels, TikTok and YouTube clips with your own soundtrack, and [press.html](press.html) is the press kit (bookings, venue screens, commissions, footage licensing). Edit the contact details in `js/config.js` (`BRAND`).
+
 Backend (Supabase): **[reafrondersbe](https://github.com/edmundondo/reafrondersbe)**
 
 ## How it works, in DJ terms

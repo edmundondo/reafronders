@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Futurart Press Kit</title>
+  <meta name="description" content="Futurart by Edward Mundondo: a living, generative atlas of Africa's natural wonders. Live AV sets, venue screens, commissioned sites and footage licensing.">
+  <meta property="og:title" content="Futurart by Edward Mundondo">
+  <meta property="og:description" content="A living, generative atlas of Africa's natural wonders, painted in particles.">
+  <meta property="og:image" content="https://edmundondo.github.io/reafronders/media/press/futurart-lake-kariba.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='12' fill='none' stroke='%232ec4b6' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23f4d35e'/%3E%3C/svg%3E">
+  <style>
+    :root { --bg: #05080d; --panel: #0b121c; --ink: #e8f1f2; --mute: #93a7ad; --line: rgba(255,255,255,.12); --teal: #2EC4B6; --gold: #F4D35E; --serif: "Instrument Serif", Georgia, serif; --sans: "Space Grotesk", system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 var(--sans); }
+    a { color: var(--teal); }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+    header.top { display: flex; justify-content: space-between; align-items: center; padding: 18px 0; }
+    header.top .mark { font-weight: 600; letter-spacing: .02em; text-decoration: none; color: var(--ink); display: flex; gap: 10px; align-items: center; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--teal); box-shadow: inset 0 0 0 2px var(--bg), inset 0 0 0 6px var(--gold); }
+    header.top nav a { margin-left: 18px; color: var(--mute); text-decoration: none; font-size: 14px; }
+    header.top nav a:hover { color: var(--ink); }
+    .hero { position: relative; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); min-height: 520px; display: grid; align-items: end; }
+    .hero video, .hero img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(5,8,13,.25), rgba(5,8,13,.55) 35%, rgba(5,8,13,.94)); }
+    .hero .copy { text-shadow: 0 2px 18px rgba(0,0,0,.55); }
+    .hero .copy { position: relative; z-index: 1; padding: 34px; max-width: 760px; }
+    .kick { font-weight: 600; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
+    h1 { font: 400 clamp(44px, 7vw, 84px)/1 var(--serif); margin: 10px 0 14px; }
+    h1 em { color: var(--teal); }
+    .lede { font-size: 18px; color: #d3e2e4; max-width: 640px; }
+    .btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+    .btn { display: inline-block; padding: 11px 18px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink); text-decoration: none; font-weight: 500; background: rgba(255,255,255,.05); }
+    .btn.primary { background: var(--teal); color: #031314; border-color: transparent; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; margin: 28px 0 8px; }
+    .stats div { background: var(--panel); padding: 18px; }
+    .stats b { display: block; font: 400 40px/1 var(--serif); color: var(--gold); }
+    .stats span { color: var(--mute); font-size: 13px; }
+    section { padding: 44px 0 8px; }
+    h2 { font: 400 40px/1.1 var(--serif); margin: 0 0 8px; }
+    .sub { color: var(--mute); margin: 0 0 22px; max-width: 700px; }
+    .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px; }
+    .card h3 { margin: 0 0 6px; font: 400 26px/1.15 var(--serif); }
+    .card p { margin: 0 0 12px; color: #c9d7d9; }
+    .card ul { margin: 0; padding-left: 18px; color: var(--mute); font-size: 14px; }
+    .card a.go { display: inline-block; margin-top: 12px; font-weight: 500; }
+    .stills { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 12px; }
+    .stills figure { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+    .stills img { width: 100%; height: 220px; object-fit: cover; display: block; }
+    .stills figcaption { padding: 10px 12px; font-size: 13px; color: var(--mute); display: flex; justify-content: space-between; gap: 8px; }
+    .bio { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+    .bio p { color: #c9d7d9; }
+    .contact { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 30px; display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; margin: 44px 0; }
+    .contact h2 { margin: 0; }
+    footer { color: var(--mute); font-size: 13px; padding: 10px 0 40px; }
+    @media (max-width: 760px) {
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .cards, .bio, .stills { grid-template-columns: 1fr; }
+      .hero { min-height: 460px; } .hero .copy { padding: 22px; }
+      header.top nav a:not(:last-child) { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <a class="mark" href="./"><span class="dot"></span>Futurart</a>
+      <nav><a href="#offers">Work with us</a><a href="#stills">Stills</a><a href="./">Open the atlas →</a></nav>
+    </header>
+
+    <div class="hero">
+      <video autoplay muted loop playsinline poster="media/kariba-ed-mundondo-poster.jpg">
+        <source src="media/kariba-ed-mundondo.webm" type="video/webm">
+        <source src="media/kariba-ed-mundondo.mp4" type="video/mp4">
+      </video>
+      <div class="copy">
+        <div class="kick">Futurart by Edward Mundondo</div>
+        <h1>Africa, <em>alive</em> in particles.</h1>
+        <p class="lede">A living, generative atlas of Africa’s natural wonders. Every waterfall, desert, heritage site and signature species is a source of light. Real footage grows out of the particle field, and the whole continent can play as a self-running show.</p>
+        <div class="btns">
+          <a class="btn primary" href="./">Open the living atlas</a>
+          <a class="btn" href="mailto:edmundondo@gmail.com?subject=Futurart%20booking">Book Futurart</a>
+          <a class="btn" href="https://www.instagram.com/edmundondo/" rel="noopener">Instagram @edmundondo</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div><b>7</b><span>countries: Zimbabwe, Botswana, South Africa, Namibia, Malawi, Zambia, Mozambique</span></div>
+      <div><b>86</b><span>wonders, heritage sites and signature species</span></div>
+      <div><b>25</b><span>UNESCO World Heritage sites</span></div>
+      <div><b>8</b><span>movements in the self-running Journey, looping forever</span></div>
+    </div>
+
+    <section id="offers">
+      <h2>Work with Futurart</h2>
+      <p class="sub">The atlas is the mixtape. These are the bookings.</p>
+      <div class="cards">
+        <div class="card">
+          <h3>Live AV sets</h3>
+          <p>Edward plays a DJ set while the atlas pulses in time with the music on the screen behind him, flying from the Okavango to the Drakensberg as the set builds.</p>
+          <ul><li>Clubs, festivals, galas, diaspora and cultural events</li><li>Projector, LED wall or screens; runs from a laptop browser</li><li>Custom set lists: a country, a category, or the whole continent</li></ul>
+          <a class="go" href="mailto:edmundondo@gmail.com?subject=Futurart%20AV%20set%20booking">Book an AV set →</a>
+        </div>
+        <div class="card">
+          <h3>Screens for venues</h3>
+          <p>Exhibit mode flies site to site on its own, all day, with no one at the controls. It suits lodges, hotels, airports, galleries, embassies and tourism offices.</p>
+          <ul><li>Your region featured first, in your colours</li><li>Annual licence, updates included</li><li>Works offline from a single laptop or mini-PC</li></ul>
+          <a class="go" href="mailto:edmundondo@gmail.com?subject=Futurart%20venue%20screen">Ask about a screen →</a>
+        </div>
+        <div class="card">
+          <h3>Put your site on the map</h3>
+          <p>Lodges, operators, parks and communities can commission an entry. Edward films the place, and it joins the atlas with its own footage tour and credit.</p>
+          <ul><li>Original filming on location</li><li>Short social clips cut from the atlas</li><li>Entry stays live in the atlas</li></ul>
+          <a class="go" href="mailto:edmundondo@gmail.com?subject=Futurart%20commissioned%20site">Commission a site →</a>
+        </div>
+        <div class="card">
+          <h3>License the footage</h3>
+          <p>Original footage of Southern Africa shot by Edward Mundondo, such as Lake Kariba from Kariba Heights. Full-resolution masters are available for broadcast, web and advertising.</p>
+          <ul><li>Non-exclusive or exclusive terms</li><li>Masters supplied directly, never the web previews</li></ul>
+          <a class="go" href="mailto:edmundondo@gmail.com?subject=Footage%20licence">License footage →</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="stills">
+      <h2>Stills</h2>
+      <p class="sub">Free to use for press coverage of Futurart, credited “Futurart by Edward Mundondo”.</p>
+      <div class="stills">
+        <figure><img src="media/press/futurart-lake-kariba.jpg" alt="The atlas over Zimbabwe with Edward Mundondo's Lake Kariba footage playing in the floating player"><figcaption>Lake Kariba tour <a href="media/press/futurart-lake-kariba.jpg" download>Download</a></figcaption></figure>
+        <figure><img src="media/press/futurart-africa.jpg" alt="The whole continent of Africa drawn in flowing particles with seven Southern African countries lit"><figcaption>The continent <a href="media/press/futurart-africa.jpg" download>Download</a></figcaption></figure>
+        <figure><img src="media/press/futurart-south-africa.jpg" alt="South Africa's wonders as glowing particle emitters"><figcaption>South Africa <a href="media/press/futurart-south-africa.jpg" download>Download</a></figcaption></figure>
+      </div>
+    </section>
+
+    <section>
+      <div class="bio">
+        <div>
+          <h2>The artist</h2>
+          <p>Edward Mundondo is a DJ, music producer and digital artist who grew up between Zimbabwe, Botswana and South Africa and New York and New Jersey. Futurart is his practice of algorithmic media art, in the spirit of Refik Anadol’s machine-intelligence work, built from African landscapes, heritage and data.</p>
+        </div>
+        <div>
+          <h2>How it’s made</h2>
+          <p>The atlas uses only open tools and open data: Natural Earth maps, UNESCO, Wikidata, GBIF and iNaturalist records, and openly licensed photographs and film, each credited on screen. Particles flow over the land like wind. Each wonder is an emitter with its own motion: water cascades, mountains breathe mist, heritage sites orbit. When a tour opens, the swarm samples the real footage and becomes it.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="contact">
+      <div><h2>Let’s talk</h2><p class="sub" style="margin:4px 0 0">Bookings, screens, commissions and licensing.</p></div>
+      <div class="btns" style="margin:0">
+        <a class="btn primary" href="mailto:edmundondo@gmail.com?subject=Futurart">edmundondo@gmail.com</a>
+        <a class="btn" href="https://www.instagram.com/edmundondo/" rel="noopener">Instagram @edmundondo</a>
+      </div>
+    </div>
+
+    <footer>© Edward Mundondo · Futurart. Third-party photos and footage in the atlas are credited where they appear and used under their open licences.</footer>
+  </div>
+</body>
+</html>

@@ -200,3 +200,24 @@ body.journey.awake #journey-stop { opacity: 1; }
   .studio { top: auto; left: 16px; right: 16px; bottom: 16px; width: auto; height: 70vh; }
 }
 @media (prefers-reduced-motion: reduce) { .wonder .ring { animation: none; } }
+
+/* ── Futurart signature, recorder ── */
+.brand .by { margin-left: 10px; font-size: 12px; letter-spacing: .04em; color: #F4D35E; text-decoration: none; opacity: .85; }
+.brand .by:hover { opacity: 1; text-decoration: underline; }
+#btn-record { color: #ff6b6b; }
+#rec-dialog { max-width: 440px; width: calc(100vw - 32px); background: rgba(8,12,20,.96); color: var(--ink, #e8f1f2); border: 1px solid rgba(255,255,255,.16); border-radius: 14px; padding: 0; }
+#rec-dialog::backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(4px); }
+.rec-form { padding: 20px 22px; display: grid; gap: 12px; }
+.rec-form h2 { margin: 0; font-family: "Instrument Serif", Georgia, serif; font-weight: 400; font-size: 30px; }
+.rec-form .field { display: grid; gap: 4px; }
+.rec-form label { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; opacity: .75; }
+.rec-form .check { text-transform: none; letter-spacing: 0; font-size: 14px; opacity: .9; display: flex; gap: 8px; align-items: center; }
+.rec-form select, .rec-form input[type=file] { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); color: inherit; font: inherit; }
+.rec-form .row { display: flex; justify-content: flex-end; gap: 8px; }
+.rec-form .note { margin: 0; font-size: 13px; opacity: .75; }
+#rec-pill { position: fixed; z-index: 60; top: 14px; left: 50%; transform: translateX(-50%); background: #c0392b; color: #fff; padding: 7px 14px; border-radius: 999px; font: 600 13px "Space Grotesk", system-ui, sans-serif; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.4); animation: recblink 1.2s ease-in-out infinite alternate; }
+@keyframes recblink { from { opacity: 1; } to { opacity: .7; } }
+.t-credit .lic { color: #F4D35E; margin-left: 6px; }
+@media (max-width: 720px) { .brand .by { display: none; } }
+
+.cline { fill: none; stroke: rgba(255,255,255,.28); stroke-width: 1; stroke-dasharray: 2 3; pointer-events: none; }

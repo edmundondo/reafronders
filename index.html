@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20261022g">
+  <link rel="stylesheet" href="css/style.css?v=20261022h">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='12' fill='none' stroke='%232ec4b6' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23f4d35e'/%3E%3C/svg%3E">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 </head>
@@ -19,12 +19,13 @@
   <div id="tip" role="tooltip"></div>
 
   <header class="bar">
-    <div class="brand"><span class="dot"></span>ReAfronders <em>a living atlas</em></div>
+    <div class="brand"><span class="dot"></span>ReAfronders <em>a living atlas</em> <a class="by" href="press.html" title="Press kit · bookings · licensing">Futurart by Edward Mundondo</a></div>
     <nav class="crumbs" id="crumbs"></nav>
     <div class="actions">
       <button id="btn-africa" title="Back to the whole continent">Africa</button>
       <button id="btn-journey" title="Non-interactive journey from site to site (J)">Journey</button>
       <button id="btn-exhibit" title="Fullscreen journey for a projector or LED wall (E)">Exhibit</button>
+      <button id="btn-record" title="Record a clip for Reels, TikTok or YouTube">● Record</button>
       <button id="btn-studio" class="accent" title="Add, remove and restyle wonders (S)">Studio</button>
     </div>
   </header>
@@ -88,9 +89,22 @@
   <div id="journey-title" aria-live="polite"></div>
   <button id="journey-stop" hidden>■ Stop journey <kbd>Esc</kbd></button>
 
+  <dialog id="rec-dialog" aria-labelledby="rec-h">
+    <form method="dialog" class="rec-form">
+      <h2 id="rec-h">Record a clip</h2>
+      <p class="note">Films the atlas as it plays, cropped for social, signed “Futurart by Edward Mundondo”. Nothing is uploaded — the file saves to your device.</p>
+      <div class="field"><label for="rec-fmt">Format</label><select id="rec-fmt"><option value="vertical">Vertical 9:16 · Reels, TikTok, Shorts</option><option value="square">Square 1:1 · feed post</option><option value="wide">Wide 16:9 · YouTube, screens</option></select></div>
+      <div class="field"><label for="rec-len">Length</label><select id="rec-len"><option value="15">15 s</option><option value="30" selected>30 s</option><option value="60">60 s</option><option value="90">90 s</option></select></div>
+      <div class="field"><label for="rec-what">What plays</label><select id="rec-what"><option value="view">What's on screen now (open a tour first for footage)</option><option value="journey:all">Journey · all categories</option></select></div>
+      <div class="field"><label for="rec-audio">Your track (optional)</label><input type="file" id="rec-audio" accept="audio/*"></div>
+      <label class="check"><input type="checkbox" id="rec-sign" checked> Signature &amp; Instagram handle</label>
+      <p class="note rec-tip">Tip: open a tour first — vertical clips put the footage on top and the living map beneath. Chrome on a laptop gives the smoothest result.</p>
+      <div class="row"><button value="cancel" class="ghost">Cancel</button><button id="rec-go" value="go" class="accent">● Start in 3…</button></div>
+    </form>
+  </dialog>
   <div id="toast" role="status"></div>
   <div id="pickhint" hidden>Click the map to place the wonder · <kbd>Esc</kbd> to cancel</div>
 
-  <script type="module" src="js/app.js?v=20261022g"></script>
+  <script type="module" src="js/app.js?v=20261022h"></script>
 </body>
 </html>

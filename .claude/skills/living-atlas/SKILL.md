@@ -102,6 +102,18 @@ sites. URL params: `?journey=<category|all>&dwell=<s>`, `?tour=<slug>`, `?countr
 
 **Framing:** `fitOf(iso)` fits a country to its mainland and drops polygons more than ~14° away (South Africa's Prince Edward Islands would otherwise shrink the view to a corner).
 
+**Recorder (`js/recorder.js`):** ● Record exports 9:16 / 1:1 / 16:9 clips (15–90 s) in the browser, using `captureStream` and `MediaRecorder`.
+- It composites the art, the bloom, the pins and the floating tour. In vertical clips the footage fills the top 58%.
+- It adds an optional soundtrack (the artist's own track, so clips don't get muted for copyright) and the BRAND signature from `config.js`.
+- It prefers H.264 MP4, because social apps reject VP9-in-MP4, and otherwise falls back to WebM.
+
+**Artist's own footage:** cut a 30 s loop with ffmpeg (xfade between clips, crop portrait clips to 16:9) and strip metadata (`-map_metadata -1`, which removes GPS and dates).
+- Host it same-origin in `media/` as a VP9 WebM of about 3 MB plus an H.264 MP4 fallback, so the morph can sample it.
+- Set the licence to `© <name>`. The tour credit then shows a "License this footage" mailto link.
+- Keep the masters off the site.
+
+**Press kit:** `press.html` is a static page (hero loop, stats, offers, stills in `media/press/`, contact from BRAND).
+
 **Cache-busting:** keep `?v=<stamp>` on the CSS, the app entry, every relative import and the `seed.json` fetch,
 and bump it on each release.
 
