@@ -32,12 +32,12 @@ Where edits are saved:
 - **Supabase configured and you're an editor:** in the database, live for every visitor.
 - **Supabase configured, not an editor:** a preview only.
 
-Keys: `T` tour · `E` exhibition (fullscreen auto-tour, made for a projector or LED wall) · `Esc` back.
+Keys: `J` journey · `E` exhibit (fullscreen journey for a projector or LED wall) · `Esc` back.
 URL tricks: `?country=ZWE` opens on a country, `?country=` opens on the whole continent, `?local` ignores Supabase.
 
 ## Virtual tours (30-second footage loops)
 
-Open any wonder and press **▶ Enter virtual tour**, or link straight to one with `?tour=victoria-falls`. Here's what happens over the loop:
+Open any wonder and press **▶ Enter virtual tour**, or link straight to one with `?tour=victoria-falls`. The player is a **floating card** that sits beside the wonder's pin, connected to it by a dashed leader line. It sizes itself to the screen (about a third of the width, 260–620 px; full width on phones), picks whichever side of the pin has room, and follows the pin while the map moves. Press **⤢** (X) to expand it to full screen, or **⛶** (F) for true fullscreen. Here's what happens over the loop:
 
 1. **Bloom (0–1.4 s):** the wonder's particles burst out from its point on the map.
 2. **Learn (to ~4 s):** each particle samples the colour under it in the footage and flows along the image's edges, like brush strokes painting the scene.
@@ -59,6 +59,22 @@ Open any wonder and press **▶ Enter virtual tour**, or link straight to one wi
 
 **To add or swap footage:** go to **Studio → Edit** on a wonder, then **Virtual tour footage**. Paste a direct `.webm`/`.mp4` URL plus credit, licence, source page and start time, then **▶ Preview tour**. Wikimedia Commons links allow the colour-morph. Other hosts without CORS will just crossfade.
 
+## Journey: a non-interactive display
+
+Press **Journey** (`J`), or **Exhibit** (`E`) for fullscreen. You can also link straight to it, e.g. `?journey=all&dwell=12` or `?journey=waterfall&dwell=20`, and leave it running on a screen, projector or LED wall.
+
+The camera flies from site to site. A comet of light travels a curved route between them and leaves a fading trail. At each stop, the loop player floats up beside the pin, plays the particle-to-footage morph, then shrinks back into the pin. The set has eight movements and then loops forever:
+
+| # | Movement | Order |
+|---|---|---|
+| I | A → Z | by category, then name (only the chosen category, if one is set) |
+| II | East → West | longitude, descending: following the sun |
+| III | South → North | latitude, ascending |
+| IV | Spiral outward | clockwise from north, spiralling out from the centre of the sites |
+| V–VIII | The same four in reverse | Spiral inward → North→South → West→East → Z→A |
+
+Each movement opens with a title card ("Movement II · East → West"). Set the category and the seconds per site in **Studio → Presentation → Journey**. Sites without footage get half the time. To stop, move the mouse and click **■ Stop journey**, or press `Esc`.
+
 ## Host it on GitHub Pages (free)
 
 1. Push this repo.
@@ -78,12 +94,17 @@ index.html          page shell
 css/style.css       smoked-glass UI over the artwork
 js/art.js           the generative engine (simplex curl noise, emitters, bloom)
 js/app.js           map, story panel, tour, Studio editor
-js/tour.js          virtual-tour viewer: particle↔footage morph + controls
+js/tour.js          floating loop player: particle↔footage morph, pin-anchored, controls
 js/store.js         data layer: Supabase or local browser storage
 js/config.js        your Supabase URL + key
 data/seed.json      Zimbabwe content (same file as the backend seed)
 data/africa.geojson 56 African territories, from Natural Earth via world-atlas (public domain)
 ```
+
+## Replicate it
+
+- **Skill:** `.claude/skills/living-atlas/SKILL.md` is the complete recipe: map data, schema and RLS, the art engine, the floating player, Journey, the footage rules, testing and shipping.
+- **Agent:** `.claude/agents/atlas-replicator.md` extends the atlas or clones it to a new country, region or theme. It researches verified sites, sources CC footage, writes the seed, tests and ships. Try asking Claude Code in this repo to "use the atlas-replicator agent to add Botswana".
 
 ## Open-source credits
 

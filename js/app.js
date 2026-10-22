@@ -1,7 +1,7 @@
 // ReAfronders · app shell: map, story panel, tour, and the Studio editor.
-import { Art, PALETTES, MODES, MOTIONS } from './art.js?v=20261022a';
-import { createStore, slugify } from './store.js?v=20261022a';
-import { Tour } from './tour.js?v=20261022a';
+import { Art, PALETTES, MODES, MOTIONS } from './art.js?v=20261022b';
+import { createStore, slugify } from './store.js?v=20261022b';
+import { Tour } from './tour.js?v=20261022b';
 
 const CATEGORIES = ['waterfall', 'mountain', 'gorge', 'rock', 'cave', 'wetland', 'river', 'lake', 'forest', 'desert', 'savanna', 'coast', 'volcano', 'landform'];
 const DEFAULT_PALETTE = ['#2EC4B6', '#F4D35E', '#EE964B', '#C2185B', '#7BDFF2'];
@@ -11,11 +11,12 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<'
 const isMobile = () => window.innerWidth <= 720;
 
 const state = { countries: [], wonders: [], presentation: {} };
-const view = { focus: null, selected: null, picking: false, tour: null, studio: false, draft: null, draftOriginal: null, edCountry: null };
+const view = { focus: null, selected: null, picking: false, studio: false, draft: null, draftOriginal: null, edCountry: null, traveller: null };
+const J = { token: null, travel: null, routes: [] };
 let store, geo, art, tour, baseScale = 1, tween = null, frameNo = 0;
 
 const svg = d3.select('#map');
-const gC = svg.append('g'), gL = svg.append('g'), gW = svg.append('g');
+const gC = svg.append('g'), gR = svg.append('g'), gL = svg.append('g'), gW = svg.append('g');
 const projection = d3.geoMercator();
 const path = d3.geoPath(projection);
 
@@ -31,23 +32,28 @@ function toast(msg, ms = 2600) { const t = $('#toast'); t.textContent = msg; t.c
 
 function extent() {
   const w = innerWidth, h = innerHeight;
+  if (document.body.classList.contains('journey')) return isMobile() ? [[16, 16], [w - 16, h - 16]] : [[40, 40], [w - 40, h - 40]];
   if (isMobile()) return [[16, 96], [w - 16, h * 0.54]];
   const left = 420, right = view.studio ? 440 : 24;
   return [[left, 80], [w - right, h - 24]];
 }
-function fitParams(target) {
-  const p = d3.geoMercator().fitExtent(extent(), target);
+function fitParams(target, ext) {
+  const p = d3.geoMercator().fitExtent(ext || extent(), target);
   return { s: p.scale(), t: p.translate() };
 }
 const africaFC = () => ({ type: 'FeatureCollection', features: geo.features.filter(f => !['CPV', 'MUS', 'SYC'].includes(f.id)) });
 
-function flyTo(target, animate = true) {
-  const to = fitParams(target);
-  if (target !== null && view.focus) { const f = featureOf(view.focus); if (f && d3.geoArea(f) < 0.002) to.s = Math.min(to.s, baseScale * 8); }
+function flyTo(target, animate = true, { dur = 1300, ext = null, maxZoom = 8 } = {}) {
+  const to = fitParams(target, ext);
+  if (to.s > baseScale * maxZoom) { // cap zoom, keep the target centred in the extent
+    const e = ext || extent(), c = d3.geoCentroid(target), k = (baseScale * maxZoom) / to.s;
+    const p = d3.geoMercator().scale(to.s).translate(to.t)(c), mid = [(e[0][0] + e[1][0]) / 2, (e[0][1] + e[1][1]) / 2];
+    to.s *= k; to.t = [mid[0] - (p[0] - to.t[0]) * k, mid[1] - (p[1] - to.t[1]) * k];
+  }
   if (!animate) { projection.scale(to.s).translate(to.t); redraw(true); return; }
   const from = { s: projection.scale(), t: projection.translate() };
   const iS = d3.interpolateNumber(from.s, to.s), iX = d3.interpolateNumber(from.t[0], to.t[0]), iY = d3.interpolateNumber(from.t[1], to.t[1]);
-  tween = { start: performance.now(), dur: 1300, step: (k) => { projection.scale(iS(k)).translate([iX(k), iY(k)]); } };
+  tween = { start: performance.now(), dur, step: (k) => { projection.scale(iS(k)).translate([iX(k), iY(k)]); } };
 }
 
 // ── map drawing ────────────────────────────────────────────────────────────
@@ -59,7 +65,7 @@ function drawCountries() {
       tip(ev, `${countryName(d.id)}${n ? ` · ${n} wonder${n > 1 ? 's' : ''}` : ' · not mapped yet'}`);
     })
     .on('mouseleave', hideTip)
-    .on('click', (ev, d) => { if (view.picking) return; stopTour(); focus(d.id); });
+    .on('click', (ev, d) => { if (view.picking) return; focus(d.id); });
 }
 
 function redraw(rebuildMask = false) {
@@ -73,7 +79,7 @@ function redraw(rebuildMask = false) {
     g.append('circle').attr('class', 'ring').attr('r', 7);
     g.append('circle').attr('class', 'core');
     g.append('text').attr('x', 10).attr('dy', '0.35em');
-    g.on('click', (ev, d) => { ev.stopPropagation(); if (view.picking) return; stopTour(); select(d.id); })
+    g.on('click', (ev, d) => { ev.stopPropagation(); if (view.picking) return; select(d.id); })
       .on('keydown', (ev, d) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); select(d.id); } })
       .on('mousemove', (ev, d) => tip(ev, `${d.name} — ${d.category}`)).on('mouseleave', hideTip);
     return g;
@@ -102,16 +108,26 @@ function redraw(rebuildMask = false) {
     .attr('transform', d => { const b = path.bounds(d.f), c = path.centroid(d.f); return `translate(${b[1][0] + 10},${c[1] + 5})`; })
     .text(d => `${countryName(d.iso)} · ${wondersIn(d.iso).length}`);
 
+  redrawEmitters(vw);
+  if (rebuildMask) art.setMasks(path, geo.features, view.focus ? featureOf(view.focus) : null);
+}
+
+// particle emitters (wonders + the journey's travelling comet)
+function redrawEmitters(vw = visibleWonders()) {
   const zoom = projection.scale() / baseScale;
   const radius = Math.max(5, Math.min(46, 5 * Math.sqrt(zoom) * 1.6));
   const list = vw.filter(w => !view.focus || w.country_iso === view.focus || zoom < 2).map(w => {
     const p = projection([w.lng, w.lat]);
     return { id: w.id, x: p[0], y: p[1], color: w.art?.color || '#ffffff', intensity: w.art?.intensity ?? 0.8, motion: w.art?.motion || 'orbit' };
   });
+  if (view.traveller) { const t = view.traveller, p = projection([t.lng, t.lat]); list.push({ id: '__traveller', x: p[0], y: p[1], color: t.color, intensity: 3.2, motion: 'ripple' }); }
   if (art.emitters.length !== list.length || art.emitters.some((e, i) => e.id !== list[i].id || e.color !== list[i].color)) art.setEmitters(list, radius);
   else { art.emitters = list; art.chain = list; art.radius = radius; }
   art.setSelected(view.selected);
-  if (rebuildMask) art.setMasks(path, geo.features, view.focus ? featureOf(view.focus) : null);
+  // journey routes follow the map
+  gR.selectAll('path').data(J.routes, d => d.id).join('path').attr('class', 'route')
+    .attr('d', d => d3.line()(d.pts.slice(0, Math.max(2, Math.ceil(d.pts.length * d.k))).map(q => projection(q))))
+    .style('color', d => d.color).attr('stroke', d => d.color).style('opacity', d => d.op);
 }
 
 // ── tooltip ────────────────────────────────────────────────────────────────
@@ -132,7 +148,7 @@ function select(id) {
   if (view.focus !== w.country_iso) focus(w.country_iso, { keepSelection: true });
   view.selected = id; redraw(); renderPanel(); renderCrumbs();
 }
-function home() { stopTour(); focus(null); }
+function home() { focus(null); }
 
 function renderCrumbs() {
   const el = $('#crumbs'); const parts = [`<button data-go="africa">Africa</button>`];
@@ -175,28 +191,13 @@ function renderPanel() {
       <p class="note">Click any country to enter it. More nations unlock as you add them in Studio.</p>`;
   }
   el.onclick = (e) => {
-    const b = e.target.closest('button'); if (!b) return; stopTour();
+    const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.id) select(b.dataset.id);
     if (b.dataset.iso) focus(b.dataset.iso);
     if (b.dataset.act === 'back') { view.selected = null; redraw(); renderPanel(); renderCrumbs(); }
     if (b.dataset.act === 'studio') openStudio(true);
     if (b.dataset.act === 'tour') openTour(view.selected);
   };
-}
-
-// ── tour & exhibition ──────────────────────────────────────────────────────
-function startTour() {
-  const list = visibleWonders(); if (!list.length) return;
-  let i = Math.max(0, list.findIndex(w => w.id === view.selected));
-  const next = () => { const w = list[i++ % list.length]; select(w.id); };
-  next(); view.tour = setInterval(next, 9000); $('#btn-tour').classList.add('on');
-}
-function stopTour() { if (view.tour) { clearInterval(view.tour); view.tour = null; $('#btn-tour').classList.remove('on'); } }
-function toggleExhibit() {
-  const on = !document.body.classList.contains('exhibit');
-  document.body.classList.toggle('exhibit', on);
-  if (on) { closeStudio(); try { document.documentElement.requestFullscreen?.(); } catch { } if (!view.tour) startTour(); }
-  else { try { if (document.fullscreenElement) document.exitFullscreen(); } catch { } }
 }
 
 // ── presentation ───────────────────────────────────────────────────────────
@@ -415,6 +416,12 @@ function renderLookTab() {
     <label class="check"><input type="checkbox" data-k="showBorders" ${P.showBorders ? 'checked' : ''}> Country borders</label>
     <label class="check"><input type="checkbox" data-k="showLabels" ${P.showLabels ? 'checked' : ''}> Wonder labels</label>
     <div class="field" style="margin-top:10px"><label for="p-focus">Opening view</label><select id="p-focus" data-k="focusCountry"><option value="">Whole continent</option>${state.countries.map(c => `<option value="${c.iso_a3}" ${c.iso_a3 === P.focusCountry ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div>
+    <hr>
+    <div class="lbl">Journey (non-interactive display)</div>
+    <p class="note">Flies site to site in 8 movements: A→Z, East→West, South→North, Spiral out, then the same in reverse, on a loop. Link: <code>?journey=${esc(P.journeyCategory || 'all')}&amp;dwell=${P.journeyDwell || 12}</code></p>
+    <div class="field"><label for="p-jcat">Category</label><select id="p-jcat" data-k="journeyCategory"><option value="all">All categories</option>${[...new Set(visibleWonders().map(w => w.category))].sort().map(c => `<option value="${c}" ${c === P.journeyCategory ? 'selected' : ''}>${c} (${visibleWonders().filter(w => w.category === c).length})</option>`).join('')}</select></div>
+    <div class="slider"><label for="p-journeyDwell">Seconds per site</label><output id="po-journeyDwell">${P.journeyDwell || 12}s</output><input type="range" id="p-journeyDwell" data-k="journeyDwell" min="6" max="30" step="1" value="${P.journeyDwell || 12}"></div>
+    <div class="btnrow" style="margin-bottom:14px"><button data-act="journey">▶ Start journey</button><button data-act="journey-full">⛶ Exhibit (fullscreen)</button></div>
     <p class="note">Changes are live. Save to make them the default for every visitor${store.mode === 'local' ? ' (on this browser)' : ''}.</p>
     <div class="btnrow"><button class="accent" data-act="save-look">Save as default</button><button data-act="reset-look">Reset look</button></div>`;
   el.oninput = el.onchange = (e) => {
@@ -426,10 +433,12 @@ function renderLookTab() {
   el.onclick = async (e) => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.act === 'save-look') { const r = await store.savePresentation(state); toast(r.ok ? 'Presentation saved' : r.msg); }
+    if (b.dataset.act === 'journey') startJourney();
+    if (b.dataset.act === 'journey-full') startJourney({ fullscreen: true });
     if (b.dataset.act === 'reset-look') { state.presentation = { ...store.seed.presentation }; applyPresentation(); renderLookTab(); }
   };
 }
-const formatOut = (k, v) => ({ particles: (+v).toLocaleString(), speed: (+v).toFixed(2) + '×', trail: (+v).toFixed(3), glow: (+v).toFixed(2), vortex: (+v).toFixed(2), bpm: v + ' bpm' }[k] ?? v);
+const formatOut = (k, v) => ({ journeyDwell: v + 's', particles: (+v).toLocaleString(), speed: (+v).toFixed(2) + '×', trail: (+v).toFixed(3), glow: (+v).toFixed(2), vortex: (+v).toFixed(2), bpm: v + ' bpm' }[k] ?? v);
 
 function renderDataTab() {
   const el = $('.tab[data-tab="data"]');
@@ -473,23 +482,149 @@ function renderDataTab() {
   };
 }
 
-// ── virtual tour ───────────────────────────────────────────────────────────
+// ── virtual tour (floating player) ─────────────────────────────────────────
+const closeUp = (w, r = 1.3) => d3.geoCircle().center([w.lng, w.lat]).radius(r)();
 function openTour(id, draft) {
   const w = draft || state.wonders.find(x => x.id === id); if (!w) return;
-  stopTour(); hideTip();
-  const p = projection([w.lng, w.lat]);
-  tour.show(w, { x: p[0], y: p[1] });
+  hideTip();
+  if (!draft) { if (view.focus !== w.country_iso) focus(w.country_iso, { keepSelection: true }); view.selected = w.id; renderPanel(); renderCrumbs(); }
+  flyTo(closeUp(w), true, { dur: 1100, maxZoom: 11 });
+  tour.show(w);
+}
+
+// ── Journey: non-interactive site-to-site display ──────────────────────────
+// Like a DJ set in eight movements: four orderings, then the same four played
+// backwards, looping forever. Each stop: travel → arrive → footage loop → dissolve.
+const angleCW = (dx, dy) => ((Math.atan2(dx, dy) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI * 2); // clockwise from north
+function spiralOrder(list) {
+  const c = [d3.mean(list, w => w.lng), d3.mean(list, w => w.lat)];
+  const r = list.map(w => Math.hypot(w.lng - c[0], w.lat - c[1])), rmax = Math.max(...r, 1e-6);
+  return list.map((w, i) => ({ w, k: angleCW(w.lng - c[0], w.lat - c[1]) + 2 * (r[i] / rmax) })).sort((a, b) => a.k - b.k).map(d => d.w);
+}
+const FORWARD = [
+  { n: 'I', label: 'A → Z', sub: (c) => c === 'all' ? 'every category, alphabetical' : `${c} · alphabetical`, order: l => [...l].sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)) },
+  { n: 'II', label: 'East → West', sub: () => 'following the sun', order: l => [...l].sort((a, b) => b.lng - a.lng) },
+  { n: 'III', label: 'South → North', sub: () => 'against the current', order: l => [...l].sort((a, b) => a.lat - b.lat) },
+  { n: 'IV', label: 'Spiral outward', sub: () => 'from the heart of the land', order: spiralOrder, spiral: true },
+];
+const MOVEMENTS = [...FORWARD, ...[
+  { n: 'V', label: 'Spiral inward', sub: () => 'back to the heart', of: 3 },
+  { n: 'VI', label: 'North → South', sub: () => 'with the current', of: 2 },
+  { n: 'VII', label: 'West → East', sub: () => 'towards the sunrise', of: 1 },
+  { n: 'VIII', label: 'Z → A', sub: (c) => c === 'all' ? 'every category, reversed' : `${c} · reversed`, of: 0 },
+].map(m => ({ ...m, spiral: FORWARD[m.of].spiral, order: l => FORWARD[m.of].order(l).reverse() }))];
+
+const jCat = () => state.presentation.journeyCategory || 'all';
+const jDwell = () => +state.presentation.journeyDwell || 12;
+const journeyList = () => visibleWonders().filter(w => jCat() === 'all' || w.category === jCat());
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const closeExtent = () => isMobile() ? [[16, 24], [innerWidth - 16, innerHeight * 0.4]] : [[60, 60], [innerWidth * 0.42, innerHeight - 60]];
+
+function startJourney({ fullscreen = false } = {}) {
+  if (J.token) return;
+  if (!journeyList().length) return toast(`No visible wonders in “${jCat()}”.`);
+  if (view.studio) closeStudio();
+  if (tour.open) tour.hide();
+  J.token = {}; document.body.classList.add('journey');
+  $('#journey-hud').hidden = false; $('#journey-stop').hidden = false; $('#btn-journey').classList.add('on');
+  if (fullscreen) { try { document.documentElement.requestFullscreen?.()?.catch?.(() => { }); } catch { } }
+  runJourney(J.token).catch(err => { console.error(err); stopJourney(); });
+}
+function stopJourney() {
+  if (!J.token) return;
+  J.token = null; J.travel = null; J.routes = []; view.traveller = null;
+  document.body.classList.remove('journey', 'awake');
+  $('#journey-hud').hidden = true; $('#journey-stop').hidden = true; $('#journey-title').classList.remove('show'); $('#btn-journey').classList.remove('on');
+  if (tour.open) tour.hide();
+  try { if (document.fullscreenElement) document.exitFullscreen(); } catch { }
+  view.selected = null; focus(null);
+}
+
+async function runJourney(token) {
+  const alive = () => J.token === token;
+  let prev = null;
+  while (alive()) {
+    for (const mv of MOVEMENTS) {
+      const order = mv.order(journeyList()); if (!order.length) return stopJourney();
+      await titleCard(mv, order); if (!alive()) return;
+      for (let i = 0; i < order.length; i++) {
+        const w = order[i]; hud(mv, w, i, order.length);
+        if (prev && prev.id !== w.id) { await travel(prev, w, mv, i, token); if (!alive()) return; }
+        await arrive(w); if (!alive()) return;
+        await stay(w, mv); if (!alive()) return;
+        prev = w;
+      }
+    }
+  }
+}
+
+async function titleCard(mv, order) {
+  const el = $('#journey-title');
+  el.innerHTML = `<div><span class="n">Movement ${mv.n}</span><span class="t">${esc(mv.label)}</span><span class="s">${esc(mv.sub(jCat()))} · ${order.length} site${order.length > 1 ? 's' : ''}</span></div>`;
+  view.selected = null; redraw();
+  flyTo({ type: 'FeatureCollection', features: order.map(w => ({ type: 'Feature', geometry: closeUp(w, 1.2) })) }, true, { dur: 1800, maxZoom: 6 });
+  el.classList.add('show'); await sleep(2800); el.classList.remove('show'); await sleep(500);
+}
+
+function hud(mv, w, i, n) {
+  $('#journey-hud .j-move').textContent = `${mv.n} · ${mv.label}${jCat() === 'all' ? '' : ' · ' + jCat()}`;
+  $('#journey-hud .j-site').textContent = `${w.name}`;
+  $('#journey-hud .j-steps').innerHTML = Array.from({ length: n }, (_, k) => `<i class="${k < i ? 'done' : k === i ? 'now' : ''}"></i>`).join('');
+}
+
+// a curved flight between two sites; spirals bend away from the centre, others alternate
+function travel(a, b, mv, i, token) {
+  const A = [a.lng, a.lat], B = [b.lng, b.lat], dist = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1e-6;
+  const M = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2];
+  let nrm = [-(B[1] - A[1]) / dist, (B[0] - A[0]) / dist];
+  if (mv.spiral) {
+    const L = journeyList(), c = [d3.mean(L, w => w.lng), d3.mean(L, w => w.lat)];
+    if (nrm[0] * (M[0] - c[0]) + nrm[1] * (M[1] - c[1]) < 0) nrm = [-nrm[0], -nrm[1]];
+  } else if (i % 2) nrm = [-nrm[0], -nrm[1]];
+  const C = [M[0] + nrm[0] * dist * 0.32, M[1] + nrm[1] * dist * 0.32];
+  const pts = d3.range(41).map(k => { const t = k / 40, u = 1 - t; return [u * u * A[0] + 2 * u * t * C[0] + t * t * B[0], u * u * A[1] + 2 * u * t * C[1] + t * t * B[1]]; });
+  const route = { id: `${a.id}>${b.id}>${performance.now()}`, pts, k: 0, op: 1, color: b.art?.color || '#fff' };
+  J.routes.forEach(r => r.op *= 0.55); J.routes = [...J.routes.filter(r => r.op > 0.08), route].slice(-6);
+  const dur = Math.min(5200, Math.max(2200, 1800 + dist * 650));
+  view.selected = null; view.focus = null; art.setCountryPalette(null);
+  flyTo({ type: 'FeatureCollection', features: [closeUp(a, 0.9), closeUp(b, 0.9), d3.geoCircle().center(C).radius(0.6)()].map(g => ({ type: 'Feature', geometry: g })) }, true, { dur: dur * 0.55, maxZoom: 7 });
+  return new Promise(res => { J.travel = { start: performance.now(), dur, pts, route, color: route.color, res, token }; });
+}
+
+async function arrive(w) {
+  view.focus = w.country_iso; view.selected = w.id;
+  const c = countryOf(w.country_iso); art.setCountryPalette(c?.palette?.length ? c.palette : DEFAULT_PALETTE);
+  flyTo(closeUp(w), true, { dur: 1300, ext: closeExtent(), maxZoom: 12 });
+  await sleep(1350);
+}
+
+function stay(w, mv) {
+  return new Promise(res => {
+    tour.show(w, { journey: { dwell: jDwell(), caption: `${mv.n} · ${mv.label}`, onDone: () => tour.dismiss().then(res) } });
+  });
+}
+
+// advance the travelling comet (called from the main loop)
+function stepTravel(now) {
+  const T = J.travel; if (!T) return;
+  if (T.token !== J.token) { J.travel = null; view.traveller = null; return; }
+  const k = Math.min(1, (now - T.start) / T.dur), e = d3.easeCubicInOut(k);
+  const f = e * (T.pts.length - 1), i = Math.floor(f), r = f - i, p0 = T.pts[i], p1 = T.pts[Math.min(i + 1, T.pts.length - 1)];
+  view.traveller = { lng: p0[0] + (p1[0] - p0[0]) * r, lat: p0[1] + (p1[1] - p0[1]) * r, color: T.color };
+  T.route.k = e;
+  if (k >= 1) { J.travel = null; view.traveller = null; T.res(); }
 }
 
 // ── main loop ──────────────────────────────────────────────────────────────
 let last = performance.now();
 function loop(now) {
   const dt = Math.min((now - last) / 16.67, 2.5); last = now;
+  stepTravel(now);
   if (tween) {
     const k = Math.min(1, (now - tween.start) / tween.dur); tween.step(d3.easeCubicInOut(k));
     const done = k >= 1; redraw(done || frameNo % 5 === 0); if (done) tween = null;
-  }
-  if (!document.hidden && !(tour && tour.open)) art.frame(dt);
+  } else if (J.token) redraw(false);
+  if (!document.hidden && !(tour && tour.open && tour.expanded)) art.frame(dt);
   frameNo++; requestAnimationFrame(loop);
 }
 
@@ -502,7 +637,9 @@ async function init() {
   tour = new Tour({
     noise: art.noise,
     getList: () => visibleWonders().sort((a, b) => a.country_iso.localeCompare(b.country_iso) || (a.sort_order ?? 0) - (b.sort_order ?? 0)),
-    onChange: (w) => { if (w.id !== '__draft' && w.id !== view.selected && state.wonders.some(x => x.id === w.id)) select(w.id); },
+    anchorOf: (w) => projection([w.lng, w.lat]),
+    avoidRects: () => J.token ? [] : [$('#panel'), view.studio ? $('#studio') : null].filter(Boolean).map(el => el.getBoundingClientRect()),
+    onChange: (w) => { if (w.id !== '__draft' && w.id !== view.selected && state.wonders.some(x => x.id === w.id)) { select(w.id); flyTo(closeUp(w), true, { dur: 1100, maxZoom: 11 }); } },
     onClose: () => { last = performance.now(); },
   });
   const deep = new URLSearchParams(location.search).get('tour');
@@ -513,10 +650,18 @@ async function init() {
   const start = new URLSearchParams(location.search).get('country') ?? state.presentation.focusCountry;
   if (start && featureOf(start)) setTimeout(() => focus(start), 900);
   if (deep) { const w = state.wonders.find(x => x.slug === deep); if (w) setTimeout(() => openTour(w.id), 1400); }
+  const qp = new URLSearchParams(location.search);
+  if (qp.has('journey')) {
+    if (qp.get('journey')) state.presentation.journeyCategory = qp.get('journey');
+    if (qp.get('dwell')) state.presentation.journeyDwell = +qp.get('dwell');
+    setTimeout(() => startJourney(), 1600);
+  }
 
   $('#btn-africa').onclick = home;
-  $('#btn-tour').onclick = () => view.tour ? stopTour() : startTour();
-  $('#btn-exhibit').onclick = toggleExhibit;
+  $('#btn-journey').onclick = () => J.token ? stopJourney() : startJourney();
+  $('#btn-exhibit').onclick = () => startJourney({ fullscreen: true });
+  $('#journey-stop').onclick = stopJourney;
+  let wake; addEventListener('pointermove', () => { if (!J.token) return; document.body.classList.add('awake'); clearTimeout(wake); wake = setTimeout(() => document.body.classList.remove('awake'), 2500); });
   $('#btn-studio').onclick = () => view.studio ? closeStudio() : openStudio();
   $('#studio-close').onclick = closeStudio;
   $$('.tabs button').forEach(b => b.onclick = () => {
@@ -524,14 +669,15 @@ async function init() {
     $$('.tab').forEach(t => t.hidden = t.dataset.tab !== b.dataset.tab);
   });
   addEventListener('resize', () => { art.resize(); baseScale = fitParams(africaFC()).s; flyTo(view.focus ? featureOf(view.focus) : africaFC(), false); });
-  document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) document.body.classList.remove('exhibit'); });
+
   addEventListener('keydown', (e) => {
+    if (J.token) { if (e.key === 'Escape' || e.key === 'j' || e.key === 'J') stopJourney(); return; }
     if (tour?.open) return;
     if (e.target.matches('input, textarea, select')) { if (e.key === 'Escape') e.target.blur(); return; }
-    if (e.key === 'Escape') { if (view.picking) cancelPick(); else if (document.body.classList.contains('exhibit')) toggleExhibit(); else if (view.selected) { view.selected = null; redraw(); renderPanel(); renderCrumbs(); } else if (view.focus) home(); }
+    if (e.key === 'Escape') { if (view.picking) cancelPick(); else if (view.selected) { view.selected = null; redraw(); renderPanel(); renderCrumbs(); } else if (view.focus) home(); }
     if (e.key === 's' || e.key === 'S') view.studio ? closeStudio() : openStudio();
-    if (e.key === 't' || e.key === 'T') view.tour ? stopTour() : startTour();
-    if (e.key === 'e' || e.key === 'E') toggleExhibit();
+    if (e.key === 'j' || e.key === 'J') startJourney();
+    if (e.key === 'e' || e.key === 'E') startJourney({ fullscreen: true });
   });
 }
 init().catch(err => { console.error(err); $('#panel').innerHTML = `<h2>Couldn't start</h2><p>${esc(err.message)}</p><p class="note">If you opened index.html straight from disk, serve the folder instead (e.g. <code>python3 -m http.server</code>).</p>`; });

@@ -1,24 +1,32 @@
-// ReAfronders · Virtual tour
-// The wonder's particle swarm "learns" the real footage: each particle samples
-// the colour under it and flows along the image's edges, then the video itself
-// resolves out of the swarm. Think of it as a DJ blend: particles are the
-// outgoing track, the footage is the incoming one, the Morph knob is the crossfader.
+// ReAfronders · Virtual tour (floating loop player)
+// The player is a card that floats beside the wonder's pin on the map and follows
+// it as the map moves. Inside, the wonder's particle swarm "learns" the real
+// footage — each particle samples the colour under it and flows along the image's
+// edges — then the video resolves out of the swarm and later dissolves back.
+// DJ terms: particles = outgoing track, footage = incoming track, Veil = wet/dry.
 
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const hexRGB = (h) => { const n = parseInt((h || '#ffffff').slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const isMobile = () => innerWidth <= 720;
 
 export class Tour {
-  constructor({ getList, onClose, onChange, noise }) {
-    this.getList = getList; this.onClose = onClose; this.onChange = onChange; this.noise = noise;
+  // anchorOf(w) → [x,y] screen point of a wonder; avoidRects() → [DOMRect] to keep clear of
+  constructor({ getList, onClose, onChange, noise, anchorOf, avoidRects }) {
+    Object.assign(this, { getList, onClose, onChange, noise, anchorOf, avoidRects: avoidRects || (() => []) });
     this.el = document.getElementById('tour');
+    this.stage = this.el.querySelector('.t-stage');
     this.video = document.getElementById('tour-video');
     this.c = document.getElementById('tour-canvas'); this.ctx = this.c.getContext('2d');
+    this.leader = document.getElementById('tour-leader');
     this.sc = document.createElement('canvas'); this.sctx = this.sc.getContext('2d', { willReadFrequently: true });
     this.opts = { morph: 0.22, loop: 30, trans: 4, muted: true };
     try { Object.assign(this.opts, JSON.parse(localStorage.getItem('reafronders:tour') || '{}')); } catch { }
-    this.playing = true; this.open = false; this.t = 0; this.frame = 0; this.pixels = null; this.sampleOK = false;
+    this.playing = true; this.open = false; this.expanded = false; this.journey = null;
+    this.t = 0; this.frame = 0; this.pixels = null; this.sampleOK = false;
+    this.pos = null; this.scale = 0; this.scaleTarget = 0;
     this.bind();
-    addEventListener('resize', () => this.open && this.resize());
+    addEventListener('resize', () => this.open && this.layout(true));
   }
 
   saveOpts() { try { localStorage.setItem('reafronders:tour', JSON.stringify(this.opts)); } catch { } }
@@ -26,73 +34,144 @@ export class Tour {
   bind() {
     const $ = (s) => this.el.querySelector(s);
     this.ui = { play: $('[data-t=play]'), mute: $('[data-t=mute]'), bar: $('.t-progress'), fill: $('.t-fill'), time: $('.t-time'),
-      morph: $('#t-morph'), loop: $('#t-loop'), trans: $('#t-trans'), name: $('.t-name'), kick: $('.t-kick'), credit: $('.t-credit'), empty: $('.t-empty'), note: $('.t-note') };
+      morph: $('#t-morph'), loop: $('#t-loop'), trans: $('#t-trans'), name: $('.t-name'), kick: $('.t-kick'), credit: $('.t-credit'),
+      empty: $('.t-empty'), note: $('.t-note'), expand: $('[data-t=expand]'), controls: $('.t-controls') };
     this.ui.morph.value = this.opts.morph; this.ui.loop.value = this.opts.loop; this.ui.trans.value = this.opts.trans;
     this.el.addEventListener('click', (e) => {
       const b = e.target.closest('[data-t]'); if (!b) return;
       ({ play: () => this.toggle(), mute: () => this.setMute(!this.opts.muted), prev: () => this.step(-1), next: () => this.step(1),
-        remorph: () => this.restart(), full: () => this.fullscreen(), close: () => this.close() })[b.dataset.t]?.();
+        remorph: () => this.restart(), expand: () => this.setExpanded(!this.expanded), full: () => this.fullscreen(), close: () => this.close() })[b.dataset.t]?.();
     });
-    this.ui.bar.addEventListener('click', (e) => { const r = this.ui.bar.getBoundingClientRect(); this.seek(((e.clientX - r.left) / r.width) * this.opts.loop); });
+    this.ui.bar.addEventListener('click', (e) => { const r = this.ui.bar.getBoundingClientRect(); this.seek(((e.clientX - r.left) / r.width) * this.loopLen()); });
     this.ui.morph.oninput = () => { this.opts.morph = +this.ui.morph.value; this.saveOpts(); };
     this.ui.loop.onchange = () => { this.opts.loop = +this.ui.loop.value; this.saveOpts(); };
     this.ui.trans.oninput = () => { this.opts.trans = +this.ui.trans.value; this.saveOpts(); };
     this.video.addEventListener('error', () => this.markNoVideo('Footage could not load — check the URL in Studio.'));
     addEventListener('keydown', (e) => {
-      if (!this.open || e.target.matches('input, textarea, select')) return;
+      if (!this.open || this.journey || e.target.matches('input, textarea, select')) return;
       const k = e.key.toLowerCase();
       if (k === ' ') { e.preventDefault(); this.toggle(); }
       else if (k === 'm') this.setMute(!this.opts.muted);
       else if (k === 'arrowright') this.step(1);
       else if (k === 'arrowleft') this.step(-1);
       else if (k === 'r') this.restart();
+      else if (k === 'x') this.setExpanded(!this.expanded);
       else if (k === 'f') this.fullscreen();
-      else if (k === 'escape') { e.stopImmediatePropagation(); this.close(); }
+      else if (k === 'escape') { e.stopImmediatePropagation(); this.expanded ? this.setExpanded(false) : this.close(); }
     }, true);
   }
 
-  resize() {
+  // ── sizing & placement ──────────────────────────────────────────────────
+  // Card width scales with the screen: ~36% of width, capped by height, 260–620 px.
+  cardWidth() {
+    if (this.expanded) return innerWidth;
+    if (isMobile()) return innerWidth - 32;
+    return Math.round(clamp(Math.min(innerWidth * 0.36, innerHeight * 0.5 * 16 / 9), 260, 620));
+  }
+  layout(force) {
+    const W = this.cardWidth();
+    if (!force && W === this.cw) return;
+    this.cw = W;
+    this.el.style.width = this.expanded ? '100vw' : `${W}px`;
+    this.el.classList.toggle('compact', !this.expanded && W < 440);
+    const sw = this.expanded ? innerWidth : W, sh = this.expanded ? innerHeight : Math.round(W * 9 / 16);
+    this.stage.style.height = `${sh}px`;
+    this.resizeCanvas(sw, sh);
+  }
+  resizeCanvas(w, h) {
     this.dpr = Math.min(devicePixelRatio || 1, 1.5);
-    this.w = innerWidth; this.h = innerHeight;
-    this.c.width = this.w * this.dpr; this.c.height = this.h * this.dpr; this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    this.sw = Math.ceil(this.w / 6); this.sh = Math.ceil(this.h / 6); this.sc.width = this.sw; this.sc.height = this.sh;
-    const n = Math.round(Math.min(5200, (this.w * this.h) / 260));
-    if (n !== this.n) this.alloc(n);
+    this.w = w; this.h = h;
+    this.c.width = w * this.dpr; this.c.height = h * this.dpr; this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this.sw = Math.ceil(w / 6); this.sh = Math.ceil(h / 6); this.sc.width = this.sw; this.sc.height = this.sh;
+    const n = Math.round(clamp((w * h) / 120, 600, 5200));
+    if (n !== this.n) { this.alloc(n); if (this.w0) this.seed(this.w / 2, this.h / 2); }
+  }
+  // choose the side of the pin with the most room, avoiding panels; ease toward it
+  target(ax, ay) {
+    const W = this.el.offsetWidth, H = this.el.offsetHeight, vw = innerWidth, vh = innerHeight;
+    const m = 16, top = this.journey ? 16 : 72, gap = 34;
+    if (isMobile()) return [m, ay < vh * 0.5 ? vh - H - m : top];
+    const avoid = this.avoidRects().filter(Boolean);
+    const cands = [[ax + gap, ay - H * 0.42], [ax - gap - W, ay - H * 0.42], [ax - W * 0.5, ay - gap - H], [ax - W * 0.5, ay + gap],
+      [ax + gap, ay - H + 30], [ax + gap, ay - 30], [ax - gap - W, ay - H + 30], [ax - gap - W, ay - 30]];
+    let best = null, bestScore = Infinity;
+    for (const [x0, y0] of cands) {
+      const x = clamp(x0, m, vw - W - m), y = clamp(y0, top, vh - H - m);
+      let s = Math.hypot(x - x0, y - y0) * 2;
+      if (ax > x - 10 && ax < x + W + 10 && ay > y - 10 && ay < y + H + 10) s += 5000; // never cover the pin
+      for (const r of avoid) { const ox = Math.max(0, Math.min(x + W, r.right) - Math.max(x, r.left)), oy = Math.max(0, Math.min(y + H, r.bottom) - Math.max(y, r.top)); s += (ox * oy) / 40; }
+      if (s < bestScore) { bestScore = s; best = [x, y]; }
+    }
+    return best;
+  }
+  follow() {
+    if (!this.w0) return;
+    const a = this.anchorOf(this.w0); if (!a) return;
+    const [ax, ay] = a; this.anchor = a;
+    this.scale += (this.scaleTarget - this.scale) * 0.16;
+    if (this.expanded) {
+      this.el.style.transform = `translate(0px,0px) scale(${this.scale.toFixed(3)})`; this.el.style.transformOrigin = `${ax}px ${ay}px`;
+      this.leader.style.opacity = 0; return;
+    }
+    const [tx, ty] = this.target(ax, ay);
+    if (!this.pos) this.pos = [tx, ty];
+    this.pos[0] += (tx - this.pos[0]) * 0.14; this.pos[1] += (ty - this.pos[1]) * 0.14;
+    const [x, y] = this.pos, W = this.el.offsetWidth, H = this.el.offsetHeight;
+    this.el.style.transformOrigin = `${ax - x}px ${ay - y}px`;
+    this.el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) scale(${this.scale.toFixed(3)})`;
+    // leader line: pin → nearest point on the card's edge
+    const nx = clamp(ax, x, x + W), ny = clamp(ay, y, y + H);
+    const L = this.leader, line = L.querySelector('line'), dot = L.querySelector('circle');
+    line.setAttribute('x1', ax); line.setAttribute('y1', ay); line.setAttribute('x2', nx); line.setAttribute('y2', ny);
+    dot.setAttribute('cx', ax); dot.setAttribute('cy', ay);
+    L.style.opacity = Math.max(0, this.scale - 0.3).toFixed(2);
+  }
+
+  setExpanded(on) {
+    this.expanded = on; this.el.classList.toggle('expanded', on); document.body.classList.toggle('touring-full', on);
+    this.ui.expand.textContent = on ? '⤡' : '⤢'; this.ui.expand.setAttribute('aria-label', on ? 'Float beside the site' : 'Expand to full screen');
+    this.layout(true); this.pos = null;
   }
 
   alloc(n) {
     this.n = n;
-    this.x = new Float32Array(n); this.y = new Float32Array(n); this.px = new Float32Array(n); this.py = new Float32Array(n);
-    this.vx = new Float32Array(n); this.vy = new Float32Array(n); this.age = new Float32Array(n); this.life = new Float32Array(n);
-    this.r = new Float32Array(n); this.g = new Float32Array(n); this.b = new Float32Array(n);
-    this.hx = new Float32Array(n); this.hy = new Float32Array(n);
+    for (const k of ['x', 'y', 'px', 'py', 'vx', 'vy', 'age', 'life', 'r', 'g', 'b', 'hx', 'hy']) this[k] = new Float32Array(n);
   }
 
-  // origin: {x,y} screen point of the wonder on the map — the swarm bursts from there
-  show(wonder, origin) {
-    this.open = true; this.el.hidden = false; document.body.classList.add('touring');
-    requestAnimationFrame(() => this.el.classList.add('in'));
-    this.resize(); this.load(wonder, origin);
+  // ── open / load ─────────────────────────────────────────────────────────
+  // journey: { dwell, onDone } — non-interactive: plays one pass then reports back
+  show(wonder, { journey = null } = {}) {
+    this.journey = journey; this.el.classList.toggle('kiosk', !!journey);
+    if (journey && this.expanded) this.setExpanded(false);
+    this.open = true; this.el.hidden = false; this.leader.hidden = false; document.body.classList.add('touring');
+    this.layout(true); this.pos = null; this.scale = 0.05; this.scaleTarget = 1;
+    this.load(wonder);
     if (!this.raf) { this.last = performance.now(); this.raf = requestAnimationFrame((t) => this.tick(t)); }
   }
 
-  load(w, origin) {
-    this.w0 = w; this.t = 0; this.pixels = null; this.sampleOK = false; this.hasVideo = false;
-    this.base = hexRGB(w.art?.color); this.motion = w.art?.motion || 'orbit';
-    const ox = origin?.x ?? this.w / 2, oy = origin?.y ?? this.h / 2;
+  seed(ox, oy) {
     this.ox = ox; this.oy = oy;
     for (let i = 0; i < this.n; i++) {
-      // every particle starts at the wonder's map point and blooms out to a "home" on screen
       this.hx[i] = Math.random() * this.w; this.hy[i] = Math.random() * this.h;
       this.x[i] = this.px[i] = ox; this.y[i] = this.py[i] = oy;
       this.vx[i] = this.vy[i] = 0; this.age[i] = Math.random() * 60; this.life[i] = 160 + Math.random() * 220;
       this.r[i] = this.base[0]; this.g[i] = this.base[1]; this.b[i] = this.base[2];
     }
+  }
+
+  load(w) {
+    this.w0 = w; this.t = 0; this.pixels = null; this.sampleOK = false; this.hasVideo = false; this.doneSent = false;
+    this.base = hexRGB(w.art?.color); this.motion = w.art?.motion || 'orbit';
+    this.leader.style.setProperty('--c', w.art?.color || '#fff');
+    // the swarm bursts from the pin: convert the pin to stage coordinates
+    const a = this.anchorOf(w) || [innerWidth / 2, innerHeight / 2];
+    const tgt = this.expanded ? [0, 0] : (this.pos || this.target(a[0], a[1]));
+    this.seed(clamp(a[0] - tgt[0], -this.w * 0.3, this.w * 1.3), clamp(a[1] - tgt[1], -this.h * 0.3, this.h * 1.3));
     this.ctx.globalCompositeOperation = 'source-over'; this.ctx.globalAlpha = 1;
     this.ctx.fillStyle = '#000'; this.ctx.fillRect(0, 0, this.w, this.h);
 
     const m = w.media || {};
-    this.ui.kick.textContent = `${w.category} · virtual tour`;
+    this.ui.kick.textContent = this.journey?.caption || `${w.category} · virtual tour`;
     this.ui.name.textContent = w.name;
     this.ui.note.textContent = m.note || '';
     this.ui.credit.innerHTML = m.video ? `Footage: ${esc(m.credit || 'unknown')} · ${m.source ? `<a href="${esc(m.source)}" target="_blank" rel="noopener">${esc(m.license || 'source')}</a>` : esc(m.license || '')}` : '';
@@ -106,36 +185,54 @@ export class Tour {
       for (const [src, type] of srcs) { const s = document.createElement('source'); s.src = src; s.type = type; this.video.appendChild(s); }
       this.video.load();
       this.video.addEventListener('loadeddata', () => { this.video.currentTime = +m.start || 0; if (this.playing) this.video.play().catch(() => { }); }, { once: true });
-    } else this.markNoVideo('Footage coming soon — add a video URL for this wonder in Studio → Edit → Virtual tour.');
-    this.setMute(this.opts.muted, true); this.syncPlay();
-    this.onChange?.(w);
+    } else this.markNoVideo(this.journey ? 'Footage coming soon' : 'Footage coming soon — add a video URL in Studio → Edit → Virtual tour.');
+    this.setMute(this.journey ? true : this.opts.muted, true); this.playing = true; this.syncPlay();
+    if (!this.journey) this.onChange?.(w);
   }
 
   markNoVideo(msg) { this.hasVideo = false; this.ui.empty.hidden = false; this.ui.empty.textContent = msg; this.video.style.opacity = 0; }
 
+  loopLen() {
+    if (!this.journey) return this.opts.loop;
+    return this.hasVideo ? this.journey.dwell : Math.max(5, this.journey.dwell * 0.5);
+  }
   toggle() { this.playing = !this.playing; this.syncPlay(); }
   syncPlay() {
     this.ui.play.textContent = this.playing ? '❚❚' : '▶'; this.ui.play.setAttribute('aria-label', this.playing ? 'Pause' : 'Play');
     if (this.hasVideo) this.playing ? this.video.play().catch(() => { }) : this.video.pause();
   }
   setMute(m, silent) {
-    this.opts.muted = m; this.video.muted = m; this.ui.mute.textContent = m ? '🔇' : '🔊';
+    if (!this.journey) this.opts.muted = m;
+    this.video.muted = m; this.ui.mute.textContent = m ? '🔇' : '🔊';
     this.ui.mute.setAttribute('aria-label', m ? 'Unmute' : 'Mute'); if (!silent) this.saveOpts();
   }
   restart() { this.t = 0; if (this.hasVideo) this.video.currentTime = +this.w0.media?.start || 0; }
-  seek(s) { this.t = Math.max(0, Math.min(this.opts.loop - 0.01, s)); }
+  seek(s) { this.t = clamp(s, 0, this.loopLen() - 0.01); }
   step(d) {
     const list = this.getList(); if (!list.length) return;
     const i = list.findIndex(w => w.id === this.w0.id), w = list[(i + d + list.length) % list.length];
-    this.load(w, { x: this.w / 2, y: this.h / 2 });
+    this.load(w);
   }
-  fullscreen() { try { document.fullscreenElement ? document.exitFullscreen() : this.el.requestFullscreen(); } catch { } }
-  close() {
-    this.open = false; this.el.classList.remove('in'); document.body.classList.remove('touring');
+  fullscreen() {
+    try {
+      if (document.fullscreenElement) return document.exitFullscreen();
+      if (!this.expanded) this.setExpanded(true);
+      this.el.requestFullscreen();
+    } catch { }
+  }
+  // shrink back into the pin; resolves when the animation is done
+  dismiss() {
+    this.scaleTarget = 0;
+    return new Promise(r => setTimeout(() => { this.hide(); r(); }, 520));
+  }
+  hide() {
+    this.open = false; this.el.hidden = true; this.leader.hidden = true; document.body.classList.remove('touring', 'touring-full');
     this.video.pause(); cancelAnimationFrame(this.raf); this.raf = null;
+  }
+  close() {
+    if (this.expanded) this.setExpanded(false);
     try { if (document.fullscreenElement === this.el) document.exitFullscreen(); } catch { }
-    setTimeout(() => { if (!this.open) this.el.hidden = true; }, 500);
-    this.onClose?.();
+    this.dismiss().then(() => this.onClose?.());
   }
 
   // sample the current video frame with the same "cover" crop the <video> uses
@@ -148,7 +245,7 @@ export class Tour {
     } catch { this.sampleOK = false; this.pixels = null; } // tainted (no CORS) → plain crossfade
   }
   lum(ix, iy) {
-    ix = Math.max(0, Math.min(this.sw - 1, ix)); iy = Math.max(0, Math.min(this.sh - 1, iy));
+    ix = clamp(ix, 0, this.sw - 1); iy = clamp(iy, 0, this.sh - 1);
     const k = (iy * this.sw + ix) * 4, p = this.pixels; return p[k] * 0.3 + p[k + 1] * 0.59 + p[k + 2] * 0.11;
   }
 
@@ -156,8 +253,15 @@ export class Tour {
     if (!this.open) return;
     this.raf = requestAnimationFrame((t) => this.tick(t));
     const dt = Math.min((now - this.last) / 1000, 0.25); this.last = now;
-    const L = this.opts.loop, T = Math.min(this.opts.trans, L / 2 - 0.5);
-    if (this.playing) { this.t += dt; if (this.t >= L) this.restart(); }
+    this.layout(false); this.follow();
+    const L = this.loopLen(), T = Math.min(this.opts.trans, L / 3);
+    if (this.playing) {
+      this.t += dt;
+      if (this.t >= L) {
+        if (this.journey) { this.t = L; if (!this.doneSent) { this.doneSent = true; this.journey.onDone?.(); } }
+        else this.restart();
+      }
+    }
     const t = this.t;
     // envelope: 0 = pure particles, 1 = pure footage
     const env = this.hasVideo ? smooth(T * 0.35, T, t) * (1 - smooth(L - T, L - T * 0.25, t)) : 0;
@@ -166,47 +270,47 @@ export class Tour {
 
     if (this.frame++ % 3 === 0) this.sample();
     this.video.style.opacity = env.toFixed(3);
-    this.video.style.filter = `blur(${((1 - env) * 22).toFixed(1)}px) saturate(${(1 + (1 - env) * 0.6).toFixed(2)})`;
+    this.video.style.filter = `blur(${((1 - env) * 18).toFixed(1)}px) saturate(${(1 + (1 - env) * 0.6).toFixed(2)})`;
 
     const ctx = this.ctx, veil = env > 0.98 ? this.opts.morph : 1 - env * (1 - this.opts.morph);
     ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = `rgba(0,0,0,${0.06 + env * 0.25})`; ctx.fillRect(0, 0, this.w, this.h);
-    ctx.globalCompositeOperation = 'lighter'; ctx.lineWidth = 1.1; ctx.lineCap = 'round';
+    ctx.fillStyle = `rgba(0,0,0,${0.07 + env * 0.25})`; ctx.fillRect(0, 0, this.w, this.h);
+    ctx.globalCompositeOperation = 'lighter'; ctx.lineWidth = 1; ctx.lineCap = 'round';
     const cx = this.w / 2, cy = this.h / 2, R = Math.min(this.w, this.h) * 0.32, nz = this.noise, tz = now * 0.00006;
-    const P = this.pixels, sx = this.sw / this.w, sy = this.sh / this.h;
-    ctx.globalAlpha = Math.max(0.04, veil) * 0.4;
+    const P = this.pixels, sx = this.sw / this.w, sy = this.sh / this.h, fs = 900 / Math.max(this.w, 300);
+    ctx.globalAlpha = Math.max(0.05, veil) * 0.42;
 
-    const BLOOM = 1.4, bloomK = t < BLOOM ? 1 - Math.pow(1 - t / BLOOM, 3) : 1;
-    if (t < BLOOM) ctx.globalAlpha = 0.35;
+    const BLOOM = 1.3, bloomK = t < BLOOM ? 1 - Math.pow(1 - t / BLOOM, 3) : 1;
+    if (t < BLOOM) ctx.globalAlpha = 0.38;
     for (let i = 0; i < this.n; i++) {
       let x = this.x[i], y = this.y[i]; this.px[i] = x; this.py[i] = y;
-      if (t < BLOOM) { // the swarm leaves the map point and fans out across the screen
-        const sw = this.noise(i * 0.013, t * 2) * 60 * (1 - bloomK);
+      if (t < BLOOM) { // the swarm pours out of the pin and fans across the card
+        const sw = this.noise(i * 0.013, t * 2) * 40 * (1 - bloomK);
         this.x[i] = this.ox + (this.hx[i] - this.ox) * bloomK + sw; this.y[i] = this.oy + (this.hy[i] - this.oy) * bloomK - sw;
         ctx.strokeStyle = `rgb(${this.r[i] | 0},${this.g[i] | 0},${this.b[i] | 0})`;
         ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(this.x[i] + 0.01, this.y[i]); ctx.stroke(); continue;
       }
-      // flow: curl-ish noise + motion signature + (when learning) glide along image edges
-      const a = nz(x * 0.003 + tz, y * 0.003 - tz) * Math.PI * 2;
-      let ax = Math.cos(a) * 0.35, ay = Math.sin(a) * 0.35;
+      // flow: noise + motion signature + (when learning) glide along image edges
+      const a = nz(x * 0.003 * fs + tz, y * 0.003 * fs - tz) * Math.PI * 2;
+      let ax = Math.cos(a) * 0.3, ay = Math.sin(a) * 0.3;
       const dx = x - cx, dy = y - cy, d = Math.hypot(dx, dy) + 0.01, nx = dx / d, ny = dy / d, k = 1 - learn;
       switch (this.motion) {
-        case 'cascade': ay += 0.5 * k; break;
-        case 'orbit': ax += -ny * 0.6 * k - nx * 0.15 * k * (d > R); ay += nx * 0.6 * k - ny * 0.15 * k * (d > R); break;
-        case 'sink': ax += (-ny * 0.6 - nx * 0.25) * k; ay += (nx * 0.6 - ny * 0.25) * k; break;
-        case 'ripple': ax += nx * 0.3 * k; ay += ny * 0.3 * k; break;
-        case 'mist': ay -= 0.3 * k; break;
-        case 'zigzag': ax += (Math.sin(this.age[i] * 0.15) > 0 ? 0.5 : -0.5) * k; ay += 0.25 * k; break;
-        default: ax -= nx * 0.08 * k * (d > R); ay -= ny * 0.08 * k * (d > R);
+        case 'cascade': ay += 0.45 * k; break;
+        case 'orbit': ax += -ny * 0.5 * k - nx * 0.12 * k * (d > R); ay += nx * 0.5 * k - ny * 0.12 * k * (d > R); break;
+        case 'sink': ax += (-ny * 0.5 - nx * 0.2) * k; ay += (nx * 0.5 - ny * 0.2) * k; break;
+        case 'ripple': ax += nx * 0.25 * k; ay += ny * 0.25 * k; break;
+        case 'mist': ay -= 0.25 * k; break;
+        case 'zigzag': ax += (Math.sin(this.age[i] * 0.15) > 0 ? 0.45 : -0.45) * k; ay += 0.2 * k; break;
+        default: ax -= nx * 0.07 * k * (d > R); ay -= ny * 0.07 * k * (d > R);
       }
       if (learn > 0 && P) {
         const ix = (x * sx) | 0, iy = (y * sy) | 0;
         const gx = this.lum(ix + 1, iy) - this.lum(ix - 1, iy), gy = this.lum(ix, iy + 1) - this.lum(ix, iy - 1);
         const gm = Math.hypot(gx, gy) + 0.001;
-        ax += (-gy / gm) * 0.9 * learn; ay += (gx / gm) * 0.9 * learn; // tangent to edges, like brush strokes
-        const q = (Math.max(0, Math.min(this.sh - 1, iy)) * this.sw + Math.max(0, Math.min(this.sw - 1, ix))) * 4;
-        const m = 0.12 * learn;
-        this.r[i] += (P[q] - this.r[i]) * m; this.g[i] += (P[q + 1] - this.g[i]) * m; this.b[i] += (P[q + 2] - this.b[i]) * m;
+        ax += (-gy / gm) * 0.8 * learn; ay += (gx / gm) * 0.8 * learn; // tangent to edges, like brush strokes
+        const q = (clamp(iy, 0, this.sh - 1) * this.sw + clamp(ix, 0, this.sw - 1)) * 4;
+        const mm = 0.12 * learn;
+        this.r[i] += (P[q] - this.r[i]) * mm; this.g[i] += (P[q + 1] - this.g[i]) * mm; this.b[i] += (P[q + 2] - this.b[i]) * mm;
       } else {
         this.r[i] += (this.base[0] - this.r[i]) * 0.02; this.g[i] += (this.base[1] - this.g[i]) * 0.02; this.b[i] += (this.base[2] - this.b[i]) * 0.02;
       }
@@ -214,7 +318,6 @@ export class Tour {
       x += this.vx[i] * (this.playing ? 1 : 0.15); y += this.vy[i] * (this.playing ? 1 : 0.15);
       this.age[i]++;
       if (this.age[i] > this.life[i] || x < -20 || y < -20 || x > this.w + 20 || y > this.h + 20) {
-        // respawn: anywhere once the swarm has "learned" the scene, near centre before
         x = Math.random() * this.w; y = Math.random() * this.h;
         this.px[i] = x; this.py[i] = y; this.vx[i] = this.vy[i] = 0; this.age[i] = 0;
       }
@@ -226,7 +329,7 @@ export class Tour {
 
     this.ui.fill.style.width = `${(t / L) * 100}%`;
     const phase = !this.hasVideo ? 'particles' : t < T ? 'morphing in' : t > L - T ? 'dissolving' : 'footage';
-    this.ui.time.textContent = `${Math.floor(t)}s / ${L}s · ${phase}`;
+    this.ui.time.textContent = `${Math.floor(t)}s / ${Math.round(L)}s · ${phase}`;
   }
 }
 
