@@ -1,7 +1,7 @@
 // ReAfronders · app shell: map, story panel, tour, and the Studio editor.
-import { Art, PALETTES, MODES, MOTIONS } from './art.js?v=20261022d';
-import { createStore, slugify } from './store.js?v=20261022d';
-import { Tour } from './tour.js?v=20261022d';
+import { Art, PALETTES, MODES, MOTIONS } from './art.js?v=20261022e';
+import { createStore, slugify } from './store.js?v=20261022e';
+import { Tour } from './tour.js?v=20261022e';
 
 const CATEGORIES = ['waterfall', 'mountain', 'gorge', 'rock', 'cave', 'wetland', 'river', 'lake', 'forest', 'desert', 'savanna', 'coast', 'volcano', 'landform', 'heritage', 'flora', 'fauna'];
 const DEFAULT_PALETTE = ['#2EC4B6', '#F4D35E', '#EE964B', '#C2185B', '#7BDFF2'];
@@ -22,6 +22,13 @@ const path = d3.geoPath(projection);
 
 // ── helpers ────────────────────────────────────────────────────────────────
 const featureOf = (iso) => geo.features.find(f => f.id === iso);
+// Frame a country on its mainland: drop far-off islands (e.g. South Africa's Prince Edward Islands) that would shrink the view
+const fitOf = (iso) => {
+  const f = featureOf(iso); if (!f || f.geometry.type !== 'MultiPolygon') return f;
+  const P = (c) => ({ type: 'Polygon', coordinates: c }), size = (c) => { const [[a, b], [x, y]] = d3.geoBounds(P(c)); return (x - a) * (y - b); };
+  const polys = f.geometry.coordinates, main = polys.reduce((a, b) => size(b) > size(a) ? b : a), c = d3.geoCentroid(P(main));
+  return { ...f, geometry: { type: 'MultiPolygon', coordinates: polys.filter(p => d3.geoDistance(d3.geoCentroid(P(p)), c) < 0.25) } };
+};
 const countryOf = (iso) => state.countries.find(c => c.iso_a3 === iso);
 const countryName = (iso) => countryOf(iso)?.name || featureOf(iso)?.properties.name || iso;
 const visibleWonders = () => state.wonders.filter(w => w.visible !== false && (countryOf(w.country_iso)?.active !== false));
@@ -139,7 +146,7 @@ function focus(iso, { keepSelection = false } = {}) {
   view.focus = iso; if (!keepSelection) view.selected = null;
   const c = countryOf(iso);
   art.setCountryPalette(iso ? (c?.palette?.length ? c.palette : DEFAULT_PALETTE) : null);
-  flyTo(iso ? featureOf(iso) : africaFC());
+  flyTo(iso ? fitOf(iso) : africaFC());
   if (view.studio && iso && view.edCountry !== iso) { view.edCountry = iso; view.draft = null; renderStudio(); }
   renderPanel(); renderCrumbs();
 }
@@ -214,9 +221,9 @@ function openStudio(newWonder = false) {
   view.studio = true; $('#studio').hidden = false; $('#btn-studio').classList.add('on');
   view.edCountry = view.focus || view.edCountry || state.countries[0]?.iso_a3 || 'ZWE';
   if (newWonder) view.draft = blankWonder(view.edCountry);
-  renderStudio(); flyTo(view.focus ? featureOf(view.focus) : africaFC());
+  renderStudio(); flyTo(view.focus ? fitOf(view.focus) : africaFC());
 }
-function closeStudio() { cancelPick(); revertDraft(); view.studio = false; $('#studio').hidden = true; $('#btn-studio').classList.remove('on'); flyTo(view.focus ? featureOf(view.focus) : africaFC()); }
+function closeStudio() { cancelPick(); revertDraft(); view.studio = false; $('#studio').hidden = true; $('#btn-studio').classList.remove('on'); flyTo(view.focus ? fitOf(view.focus) : africaFC()); }
 
 function blankWonder(iso) {
   const f = featureOf(iso), c = f ? d3.geoCentroid(f) : [25, 0];
@@ -675,7 +682,7 @@ async function init() {
     $$('.tabs button').forEach(x => x.setAttribute('aria-selected', x === b));
     $$('.tab').forEach(t => t.hidden = t.dataset.tab !== b.dataset.tab);
   });
-  addEventListener('resize', () => { art.resize(); baseScale = fitParams(africaFC()).s; flyTo(view.focus ? featureOf(view.focus) : africaFC(), false); });
+  addEventListener('resize', () => { art.resize(); baseScale = fitParams(africaFC()).s; flyTo(view.focus ? fitOf(view.focus) : africaFC(), false); });
 
   addEventListener('keydown', (e) => {
     if (J.token) { if (e.key === 'Escape' || e.key === 'j' || e.key === 'J') stopJourney(); return; }

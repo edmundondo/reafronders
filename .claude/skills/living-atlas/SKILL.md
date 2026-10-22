@@ -31,8 +31,9 @@ the Studio is the mixer, and the Journey is a pre-planned set that plays itself.
 ```bash
 npm i world-atlas@2.0.2 topojson-client@3.1.0 topojson-simplify@3.0.3 i18n-iso-countries@7.11.0
 ```
-Filter `countries-50m.json` to the region's ISO-3 codes, presimplify with `quantile(t, 0.25)`, round coordinates to
-3 dp, and write `data/<region>.geojson`. Africa came out at about 58 KB for 56 territories.
+Filter `countries-50m.json` to the region's ISO-3 codes (map world-atlas numeric ids with
+`i18n-iso-countries.numericToAlpha3`), presimplify with `quantile(t, 0.25)`, round coordinates to 3 dp, and write
+`data/<region>.geojson`. Africa came out at about 58 KB for 56 territories. Handle unnamed territories (e.g. Somaliland) by name.
 
 ## 2. Content: one JSON is the source of truth
 
@@ -99,6 +100,8 @@ crossfade, with per-photo credits.
 (clockwise angle + 2·r/rmax), then the four reversed, looping forever. A comet travels a Bézier route between
 sites. URL params: `?journey=<category|all>&dwell=<s>`, `?tour=<slug>`, `?country=<ISO3>`, `?local`.
 
+**Framing:** `fitOf(iso)` fits a country to its mainland and drops polygons more than ~14° away (South Africa's Prince Edward Islands would otherwise shrink the view to a corner).
+
 **Cache-busting:** keep `?v=<stamp>` on the CSS, the app entry, every relative import and the `seed.json` fetch,
 and bump it on each release.
 
@@ -111,6 +114,7 @@ Follow **open-media-harvest**:
 - Morph-ready hosts: `upload.wikimedia.org` (normalise `thumb.wikimedia.org` URLs to
   `upload.wikimedia.org/wikipedia/commons/thumb/...`) and `inaturalist-open-data.s3.amazonaws.com`.
 - Commons videos: use the `…480p.vp9.webm` derivative as `video` and `…360p.mpeg4.mov` as `fallback`.
+- Verify sampling in a real browser: draw a frame or photo to a canvas and call `getImageData`. A non-tainted average colour means the morph works.
 
 ## 6. Test
 
@@ -136,6 +140,10 @@ Use Playwright (Chromium is preinstalled; never download browsers).
    so nothing shows as unpushed.
 6. Never rewrite published history unless the user explicitly says so. For a rewrite, temporarily set
    `remote.origin.push=+refs/heads/main:refs/heads/main`, push, then unset it.
+7. One-time setup:
+   - GitHub Pages: deploy from a branch → `main` / root.
+   - Supabase Auth → URL Configuration: add the Pages URL as a redirect.
+   - Never commit a service-role key; only the anon or publishable key goes in `config.js`.
 
 ## 8. Report back
 

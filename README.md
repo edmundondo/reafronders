@@ -2,7 +2,7 @@
 
 A generative art map in the spirit of Refik Anadol's machine-intelligence work. Thousands of light particles drift in curl-noise currents across the shape of Africa and gather around each natural wonder. Every wonder has its own colour and motion: Victoria Falls *cascades*, Chinhoyi's Sleeping Pool *sinks* in a spiral, the Matobo granite *orbits*, and Mount Nyangani rises as *mist*.
 
-**Starts with Zimbabwe: 14 entries.** These are natural wonders, plus **Great Zimbabwe** (heritage), the **Flame Lily** (flora) and the **Cave Squeaker** frog (fauna). Any other African country can be added from the built-in **Studio**.
+**7 countries, 85 entries.** Zimbabwe (15), Botswana (10), South Africa (19), Namibia (11), Malawi (10), Zambia (11) and Mozambique (9). Each country has its top natural wonders, every UNESCO World Heritage site, a signature plant and a signature animal, with a colour palette taken from its land. Any other African country can be added from the built-in **Studio**.
 
 Backend (Supabase): **[reafrondersbe](https://github.com/edmundondo/reafrondersbe)**
 
@@ -102,7 +102,7 @@ js/app.js           map, story panel, tour, Studio editor
 js/tour.js          floating loop player: particle↔footage morph, pin-anchored, controls
 js/store.js         data layer: Supabase or local browser storage
 js/config.js        your Supabase URL + key
-data/seed.json      Zimbabwe content (same file as the backend seed)
+data/seed.json      All country content (same file as the backend seed)
 data/africa.geojson 56 African territories, from Natural Earth via world-atlas (public domain)
 ```
 
