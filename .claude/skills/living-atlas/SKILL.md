@@ -166,3 +166,21 @@ Say:
 - corrections made to the input claims
 - advisor warnings that were already there
 - what only the user can do: the Pages toggle, the Auth redirect, waking a hibernated project, supplying footage
+
+## 9. Lessons from the all-Africa build (55 countries, 473 entries)
+
+- **Seed and Supabase merge.** `store.js` treats Supabase as authoritative for any country it holds and fills
+  the rest from the published `seed.json`; the first Studio edit to a seed-only country copies that whole
+  country into Supabase (`adopt`). So a new region ships with a seed commit alone; load `seed.sql` later.
+- **Verify UNESCO lists against `whc.unesco.org/en/statesparties/<iso2>`**, not Wikipedia lists (which mix
+  in tentative sites). This caught 2024 inscriptions (Tiébélé, Gedi, Melka Kunture), renamed/extended
+  properties (Andrefana Dry Forests, Odzala-Kokoua) and wrong IDs.
+- **Pace Commons.** Run `tools/harvest/atlas-pass.mjs` from the browser pane (import it via
+  `cdn.jsdelivr.net/gh/<owner>/<repo>@<sha>/…` so relative imports resolve). It sleeps ~350 ms between
+  calls, retries 429s and caches each item in localStorage, so a lost pane doesn't lose work. Four
+  parallel unpaced workers got ~90% HTTP 429.
+- **Search hits need a human pass.** Typical misfires: namesakes (Memphis TN, Lea Salonga, Moabit,
+  Haus Wenge), maps/PNGs, zoo animals, conference photos, unrelated videos. Prefer an empty entry with a
+  `note` ("No openly licensed photos of X yet") over a misleading image; the tour shows the note.
+- **Keep entries honest when media is a stand-in**: say so in `media.note` (species photographed
+  elsewhere, museum diorama, historic engraving).

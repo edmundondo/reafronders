@@ -4,7 +4,7 @@
 // footage — each particle samples the colour under it and flows along the image's
 // edges — then the video resolves out of the swarm and later dissolves back.
 // DJ terms: particles = outgoing track, footage = incoming track, Veil = wet/dry.
-import { BRAND } from './config.js?v=20261023b';
+import { BRAND } from './config.js?v=20261023c';
 
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const hexRGB = (h) => { const n = parseInt((h || '#ffffff').slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };

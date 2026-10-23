@@ -1,9 +1,9 @@
 // ReAfronders · app shell: map, story panel, tour, and the Studio editor.
-import { Art, PALETTES, MODES, MOTIONS } from './art.js?v=20261023b';
-import { createStore, slugify } from './store.js?v=20261023b';
-import { Tour } from './tour.js?v=20261023b';
-import { Recorder } from './recorder.js?v=20261023b';
-import { BRAND } from './config.js?v=20261023b';
+import { Art, PALETTES, MODES, MOTIONS } from './art.js?v=20261023c';
+import { createStore, slugify } from './store.js?v=20261023c';
+import { Tour } from './tour.js?v=20261023c';
+import { Recorder } from './recorder.js?v=20261023c';
+import { BRAND } from './config.js?v=20261023c';
 
 const CATEGORIES = ['waterfall', 'mountain', 'gorge', 'rock', 'cave', 'wetland', 'river', 'lake', 'forest', 'desert', 'savanna', 'coast', 'volcano', 'landform', 'heritage', 'flora', 'fauna'];
 const DEFAULT_PALETTE = ['#2EC4B6', '#F4D35E', '#EE964B', '#C2185B', '#7BDFF2'];
