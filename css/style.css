@@ -39,7 +39,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .wonder.sel .core { stroke-width: 2; }
 .wonder text { font: 500 11px var(--sans); fill: var(--ink); paint-order: stroke; stroke: rgba(0,0,0,.75); stroke-width: 3px; pointer-events: none; letter-spacing: .02em; }
 #map.no-labels .wonder text { display: none; }
-.clabel { font: italic 15px var(--serif); fill: var(--ink); paint-order: stroke; stroke: rgba(0,0,0,.7); stroke-width: 3px; pointer-events: none; }
+.clabel { font: italic 13px var(--serif); fill: var(--ink); paint-order: stroke; stroke: rgba(0,0,0,.7); stroke-width: 3px; pointer-events: none; }
 @keyframes ring { from { transform: scale(.6); opacity: .9 } to { transform: scale(2.6); opacity: 0 } }
 
 .bar { position: fixed; z-index: 5; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 16px; padding: 14px 18px; pointer-events: none; }

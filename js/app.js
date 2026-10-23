@@ -1,9 +1,9 @@
 // ReAfronders · app shell: map, story panel, tour, and the Studio editor.
-import { Art, PALETTES, MODES, MOTIONS } from './art.js?v=20261022h';
-import { createStore, slugify } from './store.js?v=20261022h';
-import { Tour } from './tour.js?v=20261022h';
-import { Recorder } from './recorder.js?v=20261022h';
-import { BRAND } from './config.js?v=20261022h';
+import { Art, PALETTES, MODES, MOTIONS } from './art.js?v=20261022i';
+import { createStore, slugify } from './store.js?v=20261022i';
+import { Tour } from './tour.js?v=20261022i';
+import { Recorder } from './recorder.js?v=20261022i';
+import { BRAND } from './config.js?v=20261022i';
 
 const CATEGORIES = ['waterfall', 'mountain', 'gorge', 'rock', 'cave', 'wetland', 'river', 'lake', 'forest', 'desert', 'savanna', 'coast', 'volcano', 'landform', 'heritage', 'flora', 'fauna'];
 const DEFAULT_PALETTE = ['#2EC4B6', '#F4D35E', '#EE964B', '#C2185B', '#7BDFF2'];
@@ -111,17 +111,19 @@ function redraw(rebuildMask = false) {
   });
 
   // country labels at continent scale
-  // Continent view: country labels stack in a column out at sea, with leader lines, so neighbours never collide
-  const labels = view.focus ? [] : [...act].map(iso => ({ iso, f: featureOf(iso) })).filter(d => d.f)
-    .map(d => ({ ...d, c: path.centroid(fitOf(d.iso)), b: path.bounds(fitOf(d.iso)) })).sort((a, b) => a.c[1] - b.c[1]);
-  const colX = labels.length ? Math.max(...labels.map(d => d.b[1][0])) + 28 : 0;
-  let yPrev = -Infinity; for (const d of labels) { d.y = Math.max(d.c[1], yPrev + 22); yPrev = d.y; }
-  gL.selectAll('path.cline').data(labels, d => d.iso).join('path').attr('class', 'cline')
-    .attr('d', d => `M${d.c[0]},${d.c[1]} L${colX - 14},${d.y - 4} L${colX - 4},${d.y - 4}`);
+  // Continent view: each country is labelled at its mainland centre; the busiest countries claim space first
+  // and a label that would collide with one already placed is left out (the country still shows on hover).
+  const placedL = [];
+  const labels = view.focus ? [] : [...act].map(iso => ({ iso, f: featureOf(iso), n: wondersIn(iso).length })).filter(d => d.f)
+    .sort((a, b) => b.n - a.n).map(d => { const c = path.centroid(fitOf(d.iso)); const t = `${countryName(d.iso)} · ${d.n}`; const w = t.length * 6.6, h = 15;
+      const box = [c[0] - w / 2, c[1] - h / 2, c[0] + w / 2, c[1] + h / 2];
+      if (!Number.isFinite(c[0]) || placedL.some(p => !(box[2] < p[0] || box[0] > p[2] || box[3] < p[1] || box[1] > p[3]))) return null;
+      placedL.push(box); return { ...d, c, t }; }).filter(Boolean);
+  gL.selectAll('path.cline').remove();
   gL.selectAll('text').data(labels, d => d.iso).join('text').attr('class', 'clabel')
-    .attr('text-anchor', 'start')
-    .attr('transform', d => `translate(${colX},${d.y})`)
-    .text(d => `${countryName(d.iso)} · ${wondersIn(d.iso).length}`);
+    .attr('text-anchor', 'middle')
+    .attr('transform', d => `translate(${d.c[0]},${d.c[1] + 5})`)
+    .text(d => d.t);
 
   redrawEmitters(vw);
   if (rebuildMask) art.setMasks(path, geo.features, view.focus ? featureOf(view.focus) : null);

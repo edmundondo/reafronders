@@ -1,7 +1,7 @@
 // Data layer — one interface, two "sound systems":
 //  • supabase: the club PA (shared, live, everyone hears it)
 //  • local:    headphones (your browser only; export/import JSON to share)
-import { CONFIG } from './config.js?v=20261022h';
+import { CONFIG } from './config.js?v=20261022i';
 
 const LS_KEY = 'reafronders:v1';
 const lsGet = () => { try { return JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch { return null; } };
@@ -14,9 +14,9 @@ const COUNTRY_COLS = ['iso_a3', 'name', 'region', 'tagline', 'palette', 'active'
 const pick = (o, keys) => Object.fromEntries(keys.filter(k => k in o).map(k => [k, o[k]]));
 
 export async function createStore() {
-  const seed = await (await fetch('data/seed.json?v=20261022h')).json();
+  const seed = await (await fetch('data/seed.json?v=20261022i')).json();
   const forceLocal = new URLSearchParams(location.search).has('local');
-  let sb = null, session = null, isEditor = false, mode = 'local';
+  let sb = null, session = null, isEditor = false, mode = 'local', live = new Set();
 
   if (!forceLocal && CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
     try {
@@ -42,7 +42,12 @@ export async function createStore() {
         sb.from('presentation').select('settings').eq('id', 'default').maybeSingle(),
       ]);
       if (!c.error && !w.error) {
-        return { countries: c.data, wonders: w.data, presentation: { ...seed.presentation, ...(p.data?.settings || {}) } };
+        // Supabase is authoritative for every country it holds (edits and deletions stick);
+        // countries not loaded into it yet still appear from the published seed.json.
+        live = new Set([...c.data.map(x => x.iso_a3), ...w.data.map(x => x.country_iso)]);
+        const countries = [...c.data, ...seed.countries.filter(x => !live.has(x.iso_a3))].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+        const wonders = [...w.data, ...seed.wonders.filter(x => !live.has(x.country_iso)).map(x => ({ ...x, id: x.id || x.slug }))];
+        return { countries, wonders, presentation: { ...seed.presentation, ...(p.data?.settings || {}) } };
       }
       console.warn('Supabase read failed — falling back to seed', c.error || w.error);
     }
@@ -57,6 +62,17 @@ export async function createStore() {
 
   const canPublish = () => mode === 'local' || isEditor;
 
+  // First edit to a country that is still seed-only: copy the whole country into Supabase,
+  // so it becomes live with all its wonders (not just the one being edited).
+  async function adopt(state, iso, skipSlug) {
+    if (live.has(iso)) return null;
+    const country = state.countries.find(c => c.iso_a3 === iso);
+    if (country) { const r = await sb.from('countries').upsert(pick(country, COUNTRY_COLS), { onConflict: 'iso_a3' }); if (r.error) return r.error.message; }
+    const rows = state.wonders.filter(x => x.country_iso === iso && x.slug !== skipSlug).map(x => pick(x, WONDER_COLS));
+    if (rows.length) { const r = await sb.from('wonders').upsert(rows, { onConflict: 'slug' }); if (r.error) return r.error.message; }
+    live.add(iso); return null;
+  }
+
   return {
     get mode() { return mode; }, get session() { return session; }, get isEditor() { return isEditor; },
     canPublish, load, seed,
@@ -65,6 +81,7 @@ export async function createStore() {
     async saveWonder(state, w) {
       if (mode === 'local') { lsSet(state); return { ok: true }; }
       if (!isEditor) return { ok: false, msg: 'Preview only — sign in as an editor to publish.' };
+      const err = await adopt(state, w.country_iso, w.slug); if (err) return { ok: false, msg: err };
       const country = state.countries.find(c => c.iso_a3 === w.country_iso);
       if (country) { const r = await sb.from('countries').upsert(pick(country, COUNTRY_COLS), { onConflict: 'iso_a3' }); if (r.error) return { ok: false, msg: r.error.message }; }
       const { data, error } = await sb.from('wonders').upsert(pick(w, WONDER_COLS), { onConflict: 'slug' }).select().single();
@@ -74,12 +91,14 @@ export async function createStore() {
     async deleteWonder(state, w) {
       if (mode === 'local') { lsSet(state); return { ok: true }; }
       if (!isEditor) return { ok: false, msg: 'Preview only — sign in as an editor to publish.' };
+      if (!live.has(w.country_iso)) { const err = await adopt(state, w.country_iso, w.slug); return err ? { ok: false, msg: err } : { ok: true }; }
       const { error } = await sb.from('wonders').delete().eq('slug', w.slug);
       return error ? { ok: false, msg: error.message } : { ok: true };
     },
     async saveCountry(state, c) {
       if (mode === 'local') { lsSet(state); return { ok: true }; }
       if (!isEditor) return { ok: false, msg: 'Preview only — sign in as an editor to publish.' };
+      const err = await adopt(state, c.iso_a3); if (err) return { ok: false, msg: err };
       const { error } = await sb.from('countries').upsert(pick(c, COUNTRY_COLS), { onConflict: 'iso_a3' });
       return error ? { ok: false, msg: error.message } : { ok: true };
     },
